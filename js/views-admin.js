@@ -204,7 +204,7 @@ function pushLineMessage(toUserId, text) {
   } catch (err) {
     return false;
   }
-}`;`;
+};
 
 const NODE_BOT_SCRIPT_TEMPLATE = `const express = require('express');
 const line = require('@line/bot-sdk');
@@ -236,11 +236,11 @@ app.listen(process.env.PORT || 3000, () => console.log('Bot running'));`;
 
 
 async function renderAdmin(tab, arg) {
-  const tabs = [['overview', '📊 ภาพรวม'], ['users', '👥 ผู้ใช้งาน & สิทธิ์'], ['bank', '🗂 คลังข้อสอบ'], ['summary', '📖 ไฟล์สรุป'], ['settings', '⚙️ ตั้งค่า']];
+  const tabs = [['users', '👥 จัดการสิทธิ์ & คำขอจาก LINE'], ['overview', '📊 ภาพรวม'], ['bank', '🗂 คลังข้อสอบ'], ['summary', '📖 ไฟล์สรุป'], ['settings', '⚙️ ตั้งค่า']];
   const head = `<div class="section-title"><div><p class="eyebrow">Admin Console</p><h1>ผู้ดูแลระบบ</h1></div></div>
-    <nav class="tabs">${tabs.map(([k, l]) => `<a href="#/admin/${k}" class="${tab === k || (tab === 'questions' && k === 'bank') ? 'active' : ''}">${l}</a>`).join('')}</nav>`;
-  const views = { overview: adminOverview, users: adminUsers, bank: adminBank, questions: adminQuestions, summary: adminSummary, settings: adminSettings };
-  const fn = views[tab] || adminOverview;
+    <nav class="tabs">${tabs.map(([k, l]) => `<a href="#/admin/${k}" class="${tab === k || (!tab && k === 'users') || (tab === 'questions' && k === 'bank') ? 'active' : ''}">${l}</a>`).join('')}</nav>`;
+  const views = { users: adminUsers, overview: adminOverview, bank: adminBank, questions: adminQuestions, summary: adminSummary, settings: adminSettings };
+  const fn = views[tab] || adminUsers;
   shell(head + '<div id="adminBody"><div class="ai-loading"><span class="spinner"></span> กำลังโหลด…</div></div>', { active: 'admin' });
   await fn($('#adminBody'), arg);
 }
@@ -288,7 +288,30 @@ async function adminOverview(el) {
 async function adminUsers(el) {
   const users = await Repo.getUsers();
   const today = new Date().toISOString().slice(0, 10);
+
+  // เรียงลำดับเอาคนที่รอคอนเฟิร์ม / ขอสิทธิ์จาก LINE ขึ้นมาก่อนเสมอ
+  users.sort((a, b) => {
+    const aPending = (!a.active && a.pendingApproval) ? 1 : 0;
+    const bPending = (!b.active && b.pendingApproval) ? 1 : 0;
+    if (aPending !== bPending) return bPending - aPending;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+
+  const pendingList = users.filter((u) => !u.active && u.pendingApproval);
+
   el.innerHTML = `
+    ${pendingList.length ? `
+      <div class="card pending-alert-banner" style="border-left: 5px solid #2563eb; background: rgba(37, 99, 235, 0.08); padding: 14px 18px; margin-bottom: 16px; border-radius: 10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <b style="color:#1d4ed8;font-size:15px;">🔔 มีคำขอยืนยันสิทธิ์จาก LINE / เว็บ รอคอนเฟิร์ม ${pendingList.length} รายการ</b>
+            <p class="muted small" style="margin:3px 0 0 0;">กดปุ่ม "✓ คอนเฟิร์มสิทธิ์" ข้างชื่อผู้ใช้เพื่อเลือกแพ็กเกจ ระบบจะยิงข้อความตอบกลับเข้าแชท LINE ผู้ใช้โดยอัตโนมัติทันที</p>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="btnQuickSyncCloud">🔄 ซิงค์คำขอจาก Cloud</button>
+        </div>
+      </div>
+    ` : ''}
+
     <div class="toolbar">
       <input class="input" id="userSearch" placeholder="ค้นหาชื่อผู้ใช้ / ชื่อ…">
       <span class="spacer"></span>
@@ -301,7 +324,7 @@ async function adminUsers(el) {
       <tbody>${users.map((u) => {
         const expired = u.expires && u.expires < today;
         const isPending = !u.active && u.pendingApproval;
-        return `<tr data-q="${esc((u.username + ' ' + (u.name || '')).toLowerCase())}">
+        return `<tr data-q="${esc((u.username + ' ' + (u.name || '')).toLowerCase())}" style="${isPending ? 'background:rgba(234, 179, 8, 0.06);' : ''}">
         <td><b>${esc(u.name || '-')}</b><br><small class="muted">@${esc(u.username)}</small>
           ${isPending ? '<br><span class="chip chip-warning chip-xs">⏳ รอคอนเฟิร์มสิทธิ์</span>' : ''}</td>
         <td>${u.role === 'admin' ? '<span class="chip chip-primary">แอดมิน</span>' : '<span class="chip">ผู้ใช้</span>'}</td>
@@ -330,6 +353,7 @@ async function adminUsers(el) {
   $('#userSearch').oninput = (e) => { const q = e.target.value.toLowerCase(); $$('#userTable tbody tr').forEach((tr) => (tr.style.display = tr.dataset.q.includes(q) ? '' : 'none')); };
   $('#addUser').onclick = () => userForm();
   $('#importUsers').onclick = importUsersDialog;
+  $('#btnQuickSyncCloud')?.addEventListener('click', () => $('#syncCloudUsers')?.click());
 
   $('#syncCloudUsers').onclick = async (e) => {
     const btn = e.currentTarget;

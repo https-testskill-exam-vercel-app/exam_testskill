@@ -93,7 +93,7 @@ async function route() {
       case 'summary': return renderSummary(parts[1]);
       case 'admin':
         if (App.user.role !== 'admin') return go('/home');
-        return renderAdmin(parts[1] || 'overview', parts[2]);
+        return renderAdmin(parts[1] || 'users', parts[2]);
       default: return go('/home');
     }
   } catch (e) {
@@ -113,7 +113,7 @@ function shell(content, { active = '' } = {}) {
   const nav = [
     ['home', 'หน้าหลัก', '#/home'],
     ['history', 'ประวัติการสอบ', '#/history'],
-    ...(u.role === 'admin' ? [['admin', 'ผู้ดูแลระบบ', '#/admin']] : [])
+    ...(u.role === 'admin' ? [['admin', 'ผู้ดูแลระบบ', '#/admin/users']] : [])
   ];
   const initials = (u.name || u.username).trim().charAt(0).toUpperCase();
   document.getElementById('app').innerHTML = `
