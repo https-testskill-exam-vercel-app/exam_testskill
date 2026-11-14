@@ -3220,5 +3220,97 @@ button {
   .btn-renew-banner { width: 100%; text-align: center; }
   .line-modal-actions-bar { flex-direction: column; align-items: stretch; }
   .line-modal-actions-bar .btn { width: 100%; text-align: center; }
+  .mode-grid { grid-template-columns: 1fr; }
 }
+
+/* ==========================================================================
+   🎉 Registration Success Badge & Exam Mode Chooser
+   ========================================================================== */
+
+.reg-success-icon-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 0.95rem;
+}
+
+.reg-success-img {
+  width: 105px;
+  height: 105px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 20px rgba(37, 99, 235, 0.16));
+  animation: popIn 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.exam-mode-choice-section {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.15rem;
+}
+
+.exam-mode-choice-label {
+  font-size: 0.95rem;
+  margin-bottom: 0.65rem;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.mode-option {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.mode-option:hover {
+  border-color: var(--primary-light, #3b82f6);
+  transform: translateY(-1.5px);
+}
+
+.mode-option input[type="radio"] {
+  margin-top: 0.2rem;
+  accent-color: var(--primary);
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.mode-option.active {
+  border-color: var(--primary);
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.mode-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mode-option small {
+  color: var(--text-sub);
+  line-height: 1.35;
+}
+
+.minutes-picker {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  animation: fadeIn 0.2s ease;
+}
+
 

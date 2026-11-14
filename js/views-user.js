@@ -93,8 +93,13 @@ function renderLogin(initialTab = 'login') {
 
               <form id="registerForm" autocomplete="off">
                 <label class="field">
-                  <span>ตั้งชื่อผู้ใช้ / ไอดี (สำหรับล็อกอิน)</span>
-                  <input class="input input-rounded" name="regUsername" id="regUsername" placeholder="เช่น KruThai2026 (อังกฤษ+ตัวเลข)" required>
+                  <span>1. ชื่อ–นามสกุล หรือชื่อเรียก</span>
+                  <input class="input input-rounded" name="regName" placeholder="เช่น อ.สมชาย ใจดี" required autofocus>
+                </label>
+
+                <label class="field">
+                  <span>2. ตั้งชื่อผู้ใช้ / ไอดี (สำหรับล็อกอิน)</span>
+                  <input class="input input-rounded" name="regUsername" id="regUsername" placeholder="เช่น KruThai2026 (ภาษาอังกฤษผสมตัวเลข 8 ตัวขึ้นไป)" required>
                   <div class="cred-hints" id="userHints">
                     <span class="hint-chip" data-rule="len">8 ตัวขึ้นไป</span>
                     <span class="hint-chip" data-rule="letter">ภาษาอังกฤษ (A-Z)</span>
@@ -103,14 +108,9 @@ function renderLogin(initialTab = 'login') {
                 </label>
 
                 <label class="field">
-                  <span>ชื่อ–นามสกุล หรือชื่อเรียก</span>
-                  <input class="input input-rounded" name="regName" placeholder="เช่น อ.สมชาย ใจดี" required>
-                </label>
-
-                <label class="field">
-                  <span>ตั้งรหัสผ่าน</span>
+                  <span>3. ตั้งรหัสผ่าน</span>
                   <div class="input-group">
-                    <input class="input input-rounded" type="password" name="regPassword" id="regPassword" placeholder="เช่น Pass1234 (อังกฤษ+ตัวเลข)" required>
+                    <input class="input input-rounded" type="password" name="regPassword" id="regPassword" placeholder="เช่น Pass1234 (ภาษาอังกฤษผสมตัวเลข 8 ตัวขึ้นไป)" required>
                     <button type="button" class="btn-pw-toggle btn-rounded" id="toggleRegPw" title="แสดงรหัสผ่าน" aria-label="แสดงรหัสผ่าน">
                       ${eyeIconHTML(false)}
                     </button>
@@ -123,7 +123,7 @@ function renderLogin(initialTab = 'login') {
                 </label>
 
                 <label class="field">
-                  <span>ยืนยันรหัสผ่านอีกครั้ง</span>
+                  <span>4. ยืนยันรหัสผ่านอีกครั้ง</span>
                   <div class="input-group">
                     <input class="input input-rounded" type="password" name="regConfirm" id="regConfirm" placeholder="กรอกรหัสผ่านซ้ำอีกครั้ง" required>
                     <button type="button" class="btn-pw-toggle btn-rounded" id="toggleRegConfirm" title="แสดงรหัสผ่าน" aria-label="แสดงรหัสผ่าน">
@@ -143,7 +143,9 @@ function renderLogin(initialTab = 'login') {
             </div>
 
             <div id="registerSuccessWrap" class="register-success-card hidden">
-              <div class="reg-success-icon">🎉</div>
+              <div class="reg-success-icon-box">
+                <img src="assets/register-success.png" alt="สมัครสมาชิกสำเร็จ" class="reg-success-img">
+              </div>
               <h3>สมัครสมาชิกสำเร็จ!</h3>
               <p class="muted">ไอดีของคุณได้รับการบันทึกในระบบเรียบร้อยแล้ว</p>
               <div class="reg-success-box">
@@ -860,8 +862,11 @@ async function startExam(examId) {
 
   // หากไม่มีงานค้าง หรือเลือกเริ่มทำใหม่: เด้งกล่องข้อความให้อ่านรายละเอียดชื่อชุดก่อนเข้าไปทำ
   const tagSubtitle = info.subtitle || (meta.set ? 'ชุดที่ ' + meta.set : 'ชุดรวม 100 ข้อ');
+  const defaultMin = info.timeMinutes || (info.questionCount === 100 ? 120 : 60);
+
   const proceed = await modal({
     title: 'รายละเอียดชุดข้อสอบก่อนเริ่มทำ',
+    wide: true,
     body: `
       <div class="exam-intro-box">
         <div class="exam-intro-tags">
@@ -874,50 +879,78 @@ async function startExam(examId) {
         <div class="exam-intro-grid">
           <div class="intro-stat"><b>${info.questionCount || 50}</b><small>จำนวนข้อ</small></div>
           <div class="intro-stat"><b>${App.settings.passPercent}%</b><small>เกณฑ์ผ่าน</small></div>
-          <div class="intro-stat"><b>${info.timeMinutes || (info.questionCount === 100 ? 120 : 60)}</b><small>เวลาแนะนำ (นาที)</small></div>
+          <div class="intro-stat"><b>${defaultMin}</b><small>เวลามาตรฐาน (นาที)</small></div>
         </div>
 
-        <div class="exam-intro-desc">
-          <p>${esc(info.desc || '')}</p>
-          <div class="alert alert-info small mt">
+        <div class="exam-mode-choice-section mt">
+          <div class="exam-mode-choice-label"><b>⏱️ รูปแบบการทำแบบทดสอบ (ผู้ใช้เลือกได้เอง):</b></div>
+          <div class="mode-grid">
+            <label class="mode-option active" id="modeOptionFree">
+              <input type="radio" name="examMode" value="free" checked>
+              <span>
+                <b>🧘 ไม่จับเวลา (แนะนำ)</b>
+                <small>ทำแบบสบาย ๆ ไม่จำกัดเวลา เน้นอ่านเกร็ดความรู้และทบทวนเนื้อหาทุกข้อ</small>
+              </span>
+            </label>
+            <label class="mode-option" id="modeOptionTimed">
+              <input type="radio" name="examMode" value="timed">
+              <span>
+                <b>⏱️ จับเวลาเสมือนสอบจริง</b>
+                <small>จำลองห้องสอบจริง เมื่อหมดเวลาระบบจะส่งข้อสอบและสรุปผลอัตโนมัติ</small>
+                <span class="minutes-picker hidden" id="timeMinutesWrap">
+                  กำหนดเวลา: <input class="input input-xs" type="number" id="customMinutesInp" min="5" max="600" value="${defaultMin}"> นาที
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="exam-intro-desc mt">
+          <p class="muted small">${esc(info.desc || '')}</p>
+          <div class="alert alert-info small mt-xs">
             💡 <b>คำแนะนำ:</b> ระบบมีเฉลยละเอียดพร้อมเกร็ดความรู้ทุกข้อ และบันทึกคำตอบอัตโนมัติ สามารถกลับมาทำต่อได้ตลอดเวลา
           </div>
         </div>
       </div>`,
     actions: [
       { label: 'ยกเลิก', value: null, cls: 'btn-ghost' },
-      { label: 'เริ่มทำข้อสอบ →', value: true, cls: 'btn-primary' }
-    ]
+      {
+        label: 'เริ่มทำข้อสอบ →',
+        cls: 'btn-primary',
+        onClick: (b) => {
+          const mode = b.querySelector('[name=examMode]:checked')?.value || 'free';
+          const min = Number(b.querySelector('#customMinutesInp')?.value) || defaultMin;
+          return { timed: mode === 'timed', minutes: min };
+        }
+      }
+    ],
+    onMount: (b) => {
+      const freeOpt = b.querySelector('#modeOptionFree');
+      const timedOpt = b.querySelector('#modeOptionTimed');
+      const timeWrap = b.querySelector('#timeMinutesWrap');
+
+      const updateModeView = () => {
+        const isTimed = b.querySelector('[name=examMode]:checked')?.value === 'timed';
+        freeOpt.classList.toggle('active', !isTimed);
+        timedOpt.classList.toggle('active', isTimed);
+        timeWrap.classList.toggle('hidden', !isTimed);
+      };
+
+      b.querySelectorAll('[name=examMode]').forEach((r) => {
+        r.onchange = updateModeView;
+      });
+    }
   });
 
   if (!proceed) return;
-  newAttempt(examId);
+  newAttempt(examId, proceed);
 }
 
-async function newAttempt(examId) {
+async function newAttempt(examId, options = {}) {
   const s = App.settings;
-  let timed = false, minutes = s.finalMinutes;
-  const isFinalExam = examId === 'FINAL' || examId.startsWith('FINAL-');
-  if (isFinalExam) {
-    const info = Exams.setInfo(examId);
-    const setMin = info.timeMinutes || (info.questionCount === 100 ? 120 : 60);
-    const r = await modal({
-      title: 'เลือกรูปแบบการทำแบบทดสอบ',
-      body: `<p class="muted">${esc(info.shortName || info.title || '')} (${info.questionCount} ข้อ)</p>
-        <div class="mode-grid">
-          <label class="mode-option"><input type="radio" name="mode" value="timed" checked>
-            <span><b>⏱ จับเวลา</b><small>เสมือนสอบจริง หมดเวลาระบบส่งคำตอบอัตโนมัติ</small>
-            <span class="minutes">เวลา <input class="input input-xs" type="number" name="min" min="5" max="600" value="${setMin}"> นาที</span></span></label>
-          <label class="mode-option"><input type="radio" name="mode" value="free">
-            <span><b>🧘 ไม่จับเวลา</b><small>ทำแบบสบาย ๆ เน้นอ่านเกร็ดความรู้ทุกข้อ</small></span></label>
-        </div>`,
-      actions: [{ label: 'ยกเลิก', value: null }, {
-        label: 'เริ่มทำ →', cls: 'btn-primary', onClick: (b) => ({ mode: b.querySelector('[name=mode]:checked').value, min: +b.querySelector('[name=min]').value || setMin })
-      }]
-    });
-    if (!r) return;
-    timed = r.mode === 'timed'; minutes = Math.min(600, Math.max(5, r.min));
-  }
+  const timed = !!options.timed;
+  const minutes = Math.min(600, Math.max(5, options.minutes || s.finalMinutes || 60));
+
   const p = await Exams.build(App.user, examId, s);
   if (!p.qids.length) return toast('ชุดนี้ยังไม่มีข้อสอบ', 'warning');
   p.timed = timed;
