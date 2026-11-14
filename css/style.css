@@ -2599,6 +2599,11 @@ button {
 @media (max-width: 680px) {
   .container { padding: 1.25rem 0.9rem calc(2.5rem + var(--safe-bottom)); }
 
+  /* ป้องกัน iOS Safari ซูมจอเวลาแตะช่องกรอกข้อความ */
+  .input, select, textarea {
+    font-size: 16px !important;
+  }
+
   /* Topbar on Phone */
   .topbar-inner { padding: 0.65rem 0.9rem; }
   .topbar-inner .nav { display: none; }
