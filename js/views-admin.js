@@ -2,55 +2,172 @@
 const PERM_KEYS = [...SUBJECTS.map((s) => [s.id, `เรื่อง ${s.id}`]), ['final', 'ชุดรวม']];
 
 const GAS_BOT_SCRIPT_TEMPLATE = `/**
- * LINE Messaging API Webhook - Google Apps Script (Serverless 24/7)
- * ระบบแชทตอบกลับอัตโนมัติ 4 หัวข้อ:
- * 1. ยืนยันสิทธิ์  2. ติดต่อผู้พัฒนา  3. แจ้งปัญหาการใช้งาน  4. สอบถาม อื่นๆ
+ * LINE Messaging API Webhook & Cloud Backend - Google Apps Script (24/7 Serverless)
+ * ระบบตอบกลับอัตโนมัติ 4 หัวข้อ + ฐานข้อมูลผู้ใช้ + ระบบคอนเฟิร์มสิทธิ์และตอบกลับอัตโนมัติ
  * Line ID: Panuwat_99999
  */
-const CHANNEL_ACCESS_TOKEN = 'YOUR_CHANNEL_ACCESS_TOKEN_HERE';
+const CHANNEL_ACCESS_TOKEN = 'd1xBeCIUSf5NKf8r2ZxsQKXLmq/XWz6v6xbNezf1K1Le8hMI+kJgIrZFPGlpgrd+GyEf165uFK1p8R4x3wVHJo+cfUdvjGgNFHBGLxlZI4Mlua1cBfxC5e3dDhvak3x9pQv7bQ9PalCeE9XAC/gDCAdB04t89/1O/w1cDnyilFU=';
+const SPREADSHEET_NAME = 'TestSkill_User_Database';
+const WEB_APP_URL = 'https://https-testskill-exam-vercel-app.github.io/exam_testskill/';
+
+function getDatabaseSheet(sheetName = 'Users') {
+  let ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    const files = DriveApp.getFilesByName(SPREADSHEET_NAME);
+    if (files.hasNext()) ss = SpreadsheetApp.open(files.next());
+    else ss = SpreadsheetApp.create(SPREADSHEET_NAME);
+  }
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    if (sheetName === 'Users') {
+      sheet.appendRow(['ID', 'Username', 'Name', 'Role', 'Status', 'Package', 'Expires', 'LINE_User_ID', 'LINE_Name', 'Created_At', 'Updated_At']);
+      sheet.setFrozenRows(1);
+    }
+  }
+  return sheet;
+}
 
 function doPost(e) {
   try {
-    const contents = JSON.parse(e.postData.contents);
-    const events = contents.events || [];
-    for (let i = 0; i < events.length; i++) {
-      const event = events[i];
-      if (event.type === 'message' && event.message.type === 'text') {
-        handleTextMessage(event);
-      } else if (event.type === 'follow') {
-        replyMainMenu(event.replyToken);
-      }
+    let payload = null;
+    if (e && e.postData && e.postData.contents) {
+      try { payload = JSON.parse(e.postData.contents); } catch (err) { payload = { rawText: e.postData.contents }; }
     }
-    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+    if (payload && payload.events) {
+      const events = payload.events || [];
+      for (let i = 0; i < events.length; i++) {
+        const event = events[i];
+        if (event.type === 'message' && event.message.type === 'text') handleLineTextMessage(event);
+        else if (event.type === 'follow') replyMainMenu(event.replyToken);
+      }
+      return jsonResponse({ status: 'ok', source: 'line' });
+    }
+    if (payload && payload.action) return handleWebApiAction(payload);
+    return jsonResponse({ status: 'ok', message: 'No action' });
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', error: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse({ status: 'error', error: err.toString() });
   }
 }
 
-function handleTextMessage(event) {
+function doGet(e) {
+  try {
+    const action = (e && e.parameter && e.parameter.action) || 'ping';
+    if (action === 'get_users' || action === 'list') {
+      const sheet = getDatabaseSheet('Users');
+      const data = sheet.getDataRange().getValues();
+      if (data.length <= 1) return jsonResponse([]);
+      const rows = data.slice(1);
+      const users = rows.map((r) => ({
+        id: String(r[0] || ''), username: String(r[1] || ''), name: String(r[2] || ''),
+        role: String(r[3] || 'user'), active: r[4] === 'active', pendingApproval: r[4] === 'pending',
+        package: String(r[5] || ''), expires: String(r[6] || ''), lineUserId: String(r[7] || ''),
+        createdAt: r[9] || '', updatedAt: r[10] || ''
+      })).filter((u) => u.username);
+      return jsonResponse(users);
+    }
+    return jsonResponse({ status: 'ok', service: 'TestSkill Cloud & LINE Bot', time: new Date().toISOString() });
+  } catch (err) {
+    return jsonResponse({ status: 'error', error: err.toString() });
+  }
+}
+
+function jsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleWebApiAction(payload) {
+  const action = payload.action;
+  const sheet = getDatabaseSheet('Users');
+  const data = sheet.getDataRange().getValues();
+  if (action === 'register') {
+    const u = payload.user || {};
+    const username = (u.username || '').trim();
+    if (!username) return jsonResponse({ status: 'error', message: 'Username required' });
+    let foundRow = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase() === username.toLowerCase()) { foundRow = i + 1; break; }
+    }
+    const now = new Date();
+    if (foundRow > 0) {
+      sheet.getRange(foundRow, 3).setValue(u.name || username);
+      sheet.getRange(foundRow, 5).setValue('pending');
+      sheet.getRange(foundRow, 11).setValue(now);
+    } else {
+      sheet.appendRow([u.id || ('u_' + Date.now()), username, u.name || username, u.role || 'user', 'pending', '', '', '', '', now, now]);
+    }
+    return jsonResponse({ status: 'ok', message: 'User registered to cloud' });
+  }
+  if (action === 'confirm_user') {
+    const username = (payload.username || '').trim();
+    const pkgTitle = payload.packageTitle || 'แพ็กเกจมาตรฐาน';
+    const expires = payload.expires || '';
+    const now = new Date();
+    let foundRow = -1, lineUserId = '';
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase() === username.toLowerCase()) {
+        foundRow = i + 1; lineUserId = String(data[i][7] || '').trim(); break;
+      }
+    }
+    if (foundRow > 0) {
+      sheet.getRange(foundRow, 5).setValue('active');
+      sheet.getRange(foundRow, 6).setValue(pkgTitle);
+      sheet.getRange(foundRow, 7).setValue(expires || 'ตลอดชีพ');
+      sheet.getRange(foundRow, 11).setValue(now);
+    }
+    let lineSent = false;
+    if (lineUserId) {
+      const expiryDisplay = expires ? new Date(expires).toLocaleDateString('th-TH') : 'ใช้งานได้ตลอดชีพ';
+      const pushText = "🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้คุณเรียบร้อยแล้วครับ!\\n\\n👤 ไอดี: @" + username + "\\n📦 แพ็กเกจ: " + pkgTitle + "\\n📅 วันหมดอายุ: " + expiryDisplay + "\\n\\n🔗 เข้าสู่ระบบและทำแบบทดสอบได้ทันที:\\n" + WEB_APP_URL + "\\n\\nขอให้ทำคะแนนได้ตามเป้าหมายครับ ✌️✨";
+      lineSent = pushLineMessage(lineUserId, pushText);
+    }
+    return jsonResponse({ status: 'ok', username, lineSent });
+  }
+  return jsonResponse({ status: 'error', message: 'Unknown action' });
+}
+
+function handleLineTextMessage(event) {
   const replyToken = event.replyToken;
   const userText = (event.message.text || '').trim();
   const lower = userText.toLowerCase();
-
-  if (lower.startsWith('1') || lower.includes('ยืนยัน') || lower.includes('ขอสิทธิ์') || lower.includes('อนุมัติ') || lower.includes('ต่ออายุ')) {
-    const reply = "🔑 [1. ยืนยันสิทธิ์เข้าใช้งานระบบ TestSkill]\\n\\nสวัสดีครับ ระบบได้รับเรื่องการขอยืนยันสิทธิ์ของท่านแล้ว!\\n\\n📌 กรุณาแจ้ง:\\n• ชื่อผู้ใช้ / ไอดีของคุณ (เช่น @Panuwat)\\n• ชื่อ-นามสกุล หรือชื่อเรียก\\n• แพ็กเกจที่ต้องการ:\\n  1) 🎁 แบบทดลองใช้ (30 วัน)\\n  2) 🌟 แพ็กเกจ 3 เดือน (90 วัน)\\n  3) 👑 ใช้ฟรีตลอดชีพ\\n\\nผู้ดูแลระบบ (คุณภาณuวัฒน์) จะเปิดสิทธิ์ให้ท่านโดยเร็วที่สุดครับ!";
-    sendLineReply(replyToken, [{ type: 'text', text: reply, quickReply: getQuickReplyMenu() }]);
+  const lineUserId = event.source.userId || '';
+  const userMatch = userText.match(/@([a-zA-Z0-9._-]+)/) || userText.match(/(?:ไอดี|username|user)\\s*[:=]?\\s*([a-zA-Z0-9._-]+)/i);
+  if (userMatch && userMatch[1]) {
+    const rawUsername = userMatch[1].trim();
+    linkLineUserWithUsername(rawUsername, lineUserId);
+    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ @" + rawUsername + " แล้ว]\\n\\nสวัสดีครับ @" + rawUsername + " 👋\\nระบบได้เชื่อมต่อ LINE กับไอดีในระบบเรียบร้อยแล้วครับ!\\n\\n⏳ สถานะ: รอแอดมินคอนเฟิร์มแพ็กเกจ\\nเมื่อแอดมินกดคอนเฟิร์มในระบบ จะมีข้อความแจ้งเตือนมายังแชทนี้ทันทีครับ 😊";
+    return sendLineReply(replyToken, [{ type: 'text', text: replyText, quickReply: getQuickReplyMenu() }]);
+  }
+  if (lower.startsWith('1') || lower.includes('ยืนยัน') || lower.includes('ขอสิทธิ์')) {
+    const replyText = "🔑 [1. ขอยืนยันสิทธิ์เข้าใช้งานระบบ TestSkill]\\n\\nสวัสดีครับ 👋 กรุณาพิมพ์แจ้ง \\"ไอดี\\" ของท่านในแชทนี้ได้เลยครับ เช่น:\\n👉 @ไอดีของคุณ (เช่น @KruThai2026)\\n\\nเมื่อแอดมินกดคอนเฟิร์มในระบบ จะมีข้อความแจ้งเตือนกลับมาที่นี่ทันทีครับ!";
+    sendLineReply(replyToken, [{ type: 'text', text: replyText, quickReply: getQuickReplyMenu() }]);
   } else if (lower.startsWith('2') || lower.includes('ผู้พัฒนา') || lower.includes('ติดต่อ')) {
-    const reply = "👨‍💻 [2. ติดต่อผู้พัฒนาระบบ TestSkill]\\n\\nติดต่อผู้ดูแลระบบโดยตรง:\\n• ผู้พัฒนา: คุณภาณุวัฒน์ (แอดมิน)\\n• Line ID: Panuwat_99999\\n• ระบบสอบออนไลน์ By กลางฟู\\n\\nสามารถพิมพ์ข้อความทิ้งไว้ได้เลยครับ จะมีแอดมินมาตอบกลับครับ 😊";
-    sendLineReply(replyToken, [{ type: 'text', text: reply, quickReply: getQuickReplyMenu() }]);
-  } else if (lower.startsWith('3') || lower.includes('ปัญหา') || lower.includes('บั๊ก')) {
-    const reply = "🛠️ [3. แจ้งปัญหาการใช้งาน]\\n\\nกรุณาระบุ:\\n1. ชุดข้อสอบและข้อที่พบปัญหา (เช่น ชุดที่ 5 ข้อที่ 12)\\n2. รายละเอียดปัญหาที่พบ\\n3. ภาพหน้าจอ (Screenshot) หากมี\\nทีมงานจะรีบตรวจสอบและแก้ไขให้ทันทีครับ!";
-    sendLineReply(replyToken, [{ type: 'text', text: reply, quickReply: getQuickReplyMenu() }]);
+    sendLineReply(replyToken, [{ type: 'text', text: "👨‍💻 ติดต่อผู้ดูแลระบบโดยตรง:\\n• ผู้พัฒนา: คุณภาณุวัฒน์ (แอดมิน)\\n• Line ID: Panuwat_99999\\nยินดีให้บริการครับ 😊", quickReply: getQuickReplyMenu() }]);
+  } else if (lower.startsWith('3') || lower.includes('ปัญหา')) {
+    sendLineReply(replyToken, [{ type: 'text', text: "🛠️ แจ้งปัญหาการใช้งาน:\\nกรุณาระบุชุดข้อสอบและข้อที่พบปัญหา พร้อมภาพหน้าจอ ทีมงานจะตรวจสอบและแก้ไขให้ทันทีครับ ขอบคุณครับ!", quickReply: getQuickReplyMenu() }]);
   } else if (lower.startsWith('4') || lower.includes('สอบถาม')) {
-    const reply = "❓ [4. สอบถามข้อมูลเพิ่มเติม]\\n\\n📘 ระบบสอบออนไลน์ TestSkill By กลางฟู\\n• คลังข้อสอบ 5 เรื่อง (930 ข้อ) และชุดรวม 24 ชุด (2,295 ข้อ)\\n• ระบบจับเวลา บันทึกผลอัตโนมัติ และเฉลยพร้อมเกร็ดความรู้ทุกข้อ\\nพิมพ์คำถามทิ้งไว้ในแชทนี้ได้เลยครับ!";
-    sendLineReply(replyToken, [{ type: 'text', text: reply, quickReply: getQuickReplyMenu() }]);
+    sendLineReply(replyToken, [{ type: 'text', text: "❓ สอบถามข้อมูล:\\n📘 ระบบสอบออนไลน์ TestSkill By กลางฟู คลังข้อสอบ 3,225 ข้อ พร้อมเกร็ดความรู้และ AI วิเคราะห์ผล\\nพิมพ์คำถามทิ้งไว้ได้เลยครับ!", quickReply: getQuickReplyMenu() }]);
   } else {
     replyMainMenu(replyToken);
   }
 }
 
+function linkLineUserWithUsername(username, lineUserId) {
+  if (!username || !lineUserId) return;
+  const sheet = getDatabaseSheet('Users');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][1]).toLowerCase() === username.toLowerCase()) {
+      sheet.getRange(i + 1, 8).setValue(lineUserId);
+      sheet.getRange(i + 1, 11).setValue(new Date());
+      return;
+    }
+  }
+  sheet.appendRow(['u_' + Date.now(), username, username, 'user', 'pending', '', '', lineUserId, '', new Date(), new Date()]);
+}
+
 function replyMainMenu(replyToken) {
-  const msg = "สวัสดีครับ 👋 ยินดีต้อนรับสู่ LINE Official ของ TestSkill By กลางฟู\\n\\nเลือกหัวข้อที่ต้องการรับบริการ:\\n1️⃣ ยืนยันสิทธิ์ (ขอเปิดสิทธิ์ / ต่ออายุ)\\n2️⃣ ติดต่อผู้พัฒนา (คุณภาณุวัฒน์)\\n3️⃣ แจ้งปัญหาการใช้งาน\\n4️⃣ สอบถาม อื่นๆ\\n\\nพิมพ์หมายเลข 1-4 หรือกดปุ่มเมนูด้านล่างได้ทันทีครับ";
+  const msg = "สวัสดีครับ 👋 ยินดีต้อนรับสู่ LINE Official ของ TestSkill (By กลางฟู)\\n\\nเลือกหัวข้อที่ต้องการรับบริการ:\\n1️⃣ ยืนยันสิทธิ์ (ขอเปิดสิทธิ์ / ต่ออายุ)\\n2️⃣ ติดต่อผู้พัฒนา (คุณภาณุวัฒน์)\\n3️⃣ แจ้งปัญหาการใช้งาน\\n4️⃣ สอบถาม อื่นๆ\\n\\nพิมพ์หมายเลข 1-4 หรือพิมพ์ @ไอดีของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันทีครับ";
   sendLineReply(replyToken, [{ type: 'text', text: msg, quickReply: getQuickReplyMenu() }]);
 }
 
@@ -67,13 +184,27 @@ function getQuickReplyMenu() {
 
 function sendLineReply(replyToken, messages) {
   UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
-    method: 'post',
-    contentType: 'application/json',
+    method: 'post', contentType: 'application/json',
     headers: { Authorization: 'Bearer ' + CHANNEL_ACCESS_TOKEN },
     payload: JSON.stringify({ replyToken: replyToken, messages: messages }),
     muteHttpExceptions: true
   });
-}`;
+}
+
+function pushLineMessage(toUserId, text) {
+  if (!toUserId) return false;
+  try {
+    const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'post', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + CHANNEL_ACCESS_TOKEN },
+      payload: JSON.stringify({ to: toUserId, messages: [{ type: 'text', text: text }] }),
+      muteHttpExceptions: true
+    });
+    return res.getResponseCode() === 200;
+  } catch (err) {
+    return false;
+  }
+}`;`;
 
 const NODE_BOT_SCRIPT_TEMPLATE = `const express = require('express');
 const line = require('@line/bot-sdk');
@@ -161,6 +292,7 @@ async function adminUsers(el) {
     <div class="toolbar">
       <input class="input" id="userSearch" placeholder="ค้นหาชื่อผู้ใช้ / ชื่อ…">
       <span class="spacer"></span>
+      <button class="btn btn-outline" id="syncCloudUsers" title="ดึงคำขอสมัครและยืนยันสิทธิ์จาก Google Sheet">☁️ ซิงค์จาก Cloud</button>
       <button class="btn btn-ghost" id="importUsers">นำเข้าผู้ใช้ (CSV)</button>
       <button class="btn btn-primary" id="addUser">+ เพิ่มผู้ใช้</button>
     </div>
@@ -171,12 +303,12 @@ async function adminUsers(el) {
         const isPending = !u.active && u.pendingApproval;
         return `<tr data-q="${esc((u.username + ' ' + (u.name || '')).toLowerCase())}">
         <td><b>${esc(u.name || '-')}</b><br><small class="muted">@${esc(u.username)}</small>
-          ${isPending ? '<br><span class="chip chip-warning chip-xs">⏳ รออนุมัติ / ขอสิทธิ์</span>' : ''}</td>
+          ${isPending ? '<br><span class="chip chip-warning chip-xs">⏳ รอคอนเฟิร์มสิทธิ์</span>' : ''}</td>
         <td>${u.role === 'admin' ? '<span class="chip chip-primary">แอดมิน</span>' : '<span class="chip">ผู้ใช้</span>'}</td>
         <td>
           <div class="user-status-cell">
             <label class="switch"><input type="checkbox" data-toggle="${u.id}" ${u.active ? 'checked' : ''} ${u.id === App.user.id ? 'disabled' : ''}><span></span></label>
-            ${!u.active || isPending ? `<button type="button" class="btn btn-primary btn-xs btn-approve-user" data-approve="${u.id}" title="เปิดใช้งานและเลือกแพ็กเกจให้ผู้ใช้">✓ อนุมัติสิทธิ์</button>` : ''}
+            ${!u.active || isPending ? `<button type="button" class="btn btn-primary btn-xs btn-approve-user" data-approve="${u.id}" title="คอนเฟิร์มและเลือกแพ็กเกจให้ผู้ใช้">✓ คอนเฟิร์มสิทธิ์</button>` : ''}
           </div>
         </td>
         <td>
@@ -198,6 +330,27 @@ async function adminUsers(el) {
   $('#userSearch').oninput = (e) => { const q = e.target.value.toLowerCase(); $$('#userTable tbody tr').forEach((tr) => (tr.style.display = tr.dataset.q.includes(q) ? '' : 'none')); };
   $('#addUser').onclick = () => userForm();
   $('#importUsers').onclick = importUsersDialog;
+
+  $('#syncCloudUsers').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = '⏳ กำลังซิงค์…';
+    try {
+      const res = await CloudSync.syncUsers();
+      if (res.added > 0 || res.updated > 0) {
+        toast(`ซิงค์ข้อมูลสำเร็จ! เพิ่มคำขอใหม่ ${res.added} คน, อัปเดต ${res.updated} คน`, 'success');
+        await adminUsers(el);
+      } else {
+        toast('ข้อมูลเป็นปัจจุบันแล้ว ไม่พบคำขอใหม่', 'info');
+      }
+    } catch (err) {
+      toast('ซิงค์ล้มเหลว: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '☁️ ซิงค์จาก Cloud';
+    }
+  };
+
   $$('[data-edit]').forEach((b) => (b.onclick = () => userForm(users.find((u) => u.id === b.dataset.edit))));
   $$('[data-toggle]').forEach((c) => (c.onchange = async () => { await Repo.updateUser(c.dataset.toggle, { active: c.checked, pendingApproval: false }); toast(c.checked ? 'เปิดใช้งานบัญชีแล้ว' : 'ระงับบัญชีแล้ว', 'success'); }));
   
@@ -353,7 +506,7 @@ async function packageApprovalDialog(user, mode = 'approve') {
     actions: [
       { label: 'ยกเลิก', value: null },
       {
-        label: isApprove ? '✓ ยืนยันอนุมัติและเปิดสิทธิ์' : '💾 บันทึกการต่ออายุ',
+        label: isApprove ? '✓ ยืนยันคอนเฟิร์มและเปิดสิทธิ์' : '💾 บันทึกการต่ออายุ',
         cls: 'btn-primary',
         onClick: async (b) => {
           const perms = {};
@@ -375,6 +528,64 @@ async function packageApprovalDialog(user, mode = 'approve') {
           }[selectedPkg] || 'แพ็กเกจ';
 
           toast(`บันทึกสิทธิ์ @${user.username} เรียบร้อยแล้ว (${pkgName})`, 'success');
+
+          // สั่งส่งสัญญาณคอนเฟิร์มขึ้น Cloud ให้ LINE Bot ยิงแจ้งเตือนเข้าแชทผู้ใช้โดยอัตโนมัติ
+          CloudSync.confirmUser({
+            username: user.username,
+            name: user.name,
+            packageTitle: pkgName,
+            expires: finalExpires,
+            adminName: App.user?.name || 'ภาณุวัฒน์'
+          });
+
+          // แสดงหน้าต่างสรุปและปุ่ม 1-Click ตอบกลับผ่าน LINE สำรอง
+          setTimeout(() => {
+            const confirmMsg = CloudSync.formatConfirmationMessage({
+              username: user.username,
+              packageTitle: pkgName,
+              expires: finalExpires
+            });
+
+            modal({
+              title: `🎉 คอนเฟิร์มสิทธิ์ @${esc(user.username)} เรียบร้อย!`,
+              body: `
+                <div class="confirm-done-box">
+                  <div class="confirm-done-tags" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+                    <span class="chip chip-success">✓ บันทึกแพ็กเกจ: ${esc(pkgName)}</span>
+                    <span class="chip chip-muted">หมดอายุ: ${finalExpires ? new Date(finalExpires).toLocaleDateString('th-TH') : 'ใช้งานตลอดชีพ'}</span>
+                  </div>
+                  <p class="muted small">ระบบได้บันทึกและส่งสัญญาณแจ้งเตือนไปยัง Cloud แล้ว หากผู้ใช้เคยทัก LINE บอทจะยิงข้อความคอนเฟิร์มเข้าแชทให้อัตโนมัติทันที</p>
+                  
+                  <div class="field mt">
+                    <span>ข้อความตอบกลับผู้ใช้:</span>
+                    <textarea class="input" rows="6" readonly id="doneMsgBox" style="font-size:13px;line-height:1.5;">${esc(confirmMsg)}</textarea>
+                  </div>
+                </div>
+              `,
+              actions: [
+                {
+                  label: '📱 เปิดแชท LINE ตอบกลับ (สำรอง)',
+                  cls: 'btn-outline',
+                  onClick: () => {
+                    navigator.clipboard?.writeText(confirmMsg);
+                    window.open(CloudSync.getLineChatUrl(confirmMsg), '_blank', 'noopener');
+                    return false;
+                  }
+                },
+                {
+                  label: '📋 คัดลอกข้อความ',
+                  cls: 'btn-ghost',
+                  onClick: async () => {
+                    await navigator.clipboard?.writeText(confirmMsg);
+                    toast('คัดลอกข้อความตอบกลับแล้ว', 'success');
+                    return false;
+                  }
+                },
+                { label: 'เสร็จสิ้น', value: true, cls: 'btn-primary' }
+              ]
+            });
+          }, 350);
+
           return true;
         }
       }
@@ -815,6 +1026,18 @@ async function adminSettings(el) {
       </div>
     </div>
 
+    <form id="gasSet" class="form-grid mt">
+      <label class="field full">
+        <span>🔗 Google Apps Script Web App URL (Cloud Backend & ตอบกลับ LINE อัตโนมัติ)</span>
+        <input class="input" name="gasUrl" value="${esc(s.gasUrl || '')}" placeholder="https://script.google.com/macros/s/.../exec">
+        <small class="muted">นำ Web App URL ที่ได้จากการ Deploy Google Apps Script มาใส่ที่นี่ เพื่อให้ระบบซิงค์คำขอสมัครและส่งข้อความตอบกลับเข้า LINE อัตโนมัติ</small>
+      </label>
+      <div class="row-actions full">
+        <button class="btn btn-primary btn-sm">บันทึก URL คลาวด์</button>
+        <button type="button" class="btn btn-outline btn-sm" id="testGas">ทดสอบการเชื่อมต่อ Cloud</button>
+      </div>
+    </form>
+
     <div class="row-actions mt">
       <button type="button" class="btn btn-primary btn-sm" id="btnGasCode">
         📋 โค้ด Google Apps Script (แนะนำ ฟรี 24 ชม.)
@@ -841,6 +1064,27 @@ async function adminSettings(el) {
       shuffleChoicesFinal: f.shuffleChoicesFinal.checked, announcement: f.announcement.value.trim() };
     if (next.setSize !== App.settings.setSize) toast('หมายเหตุ: การเปลี่ยนจำนวนข้อต่อชุด มีผลกับชุดที่ทำค้างของผู้ใช้', 'warning', 5000);
     await Repo.saveSettings(next); App.settings = next; toast('บันทึกแล้ว', 'success');
+  };
+  $('#gasSet').onsubmit = async (e) => {
+    e.preventDefault(); const f = e.target;
+    const next = { ...App.settings, gasUrl: f.gasUrl.value.trim() };
+    await Repo.saveSettings(next); App.settings = next; toast('บันทึก URL คลาวด์เรียบร้อยแล้ว', 'success');
+  };
+  $('#testGas').onclick = async (e) => {
+    const btn = e.currentTarget;
+    const url = $('#gasSet [name=gasUrl]').value.trim();
+    if (!url) return toast('กรุณาระบุ URL ก่อนทดสอบ', 'warning');
+    btn.disabled = true; btn.textContent = 'กำลังทดสอบ…';
+    try {
+      const res = await fetch(`${url}?action=ping&t=${Date.now()}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      toast('✓ เชื่อมต่อ Google Apps Script สำเร็จ! ' + (data.service || ''), 'success', 5000);
+    } catch (err) {
+      toast('เชื่อมต่อไม่สำเร็จ: ' + err.message + ' (อาจยังไม่ได้ Deploy เป็น Anyone)', 'error', 6000);
+    } finally {
+      btn.disabled = false; btn.textContent = 'ทดสอบการเชื่อมต่อ Cloud';
+    }
   };
   $('#aiSet').onsubmit = async (e) => {
     e.preventDefault(); const f = e.target;

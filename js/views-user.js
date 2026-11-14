@@ -153,14 +153,14 @@ function renderLogin(initialTab = 'login') {
                 <div class="reg-status-badge"><span class="chip chip-warning">⏳ อยู่ระหว่างรอผู้ดูแลระบบเปิดสิทธิ์ใช้งาน</span></div>
               </div>
               <div class="reg-next-step">
-                <p><b>⚠️ ขั้นตอนต่อไป:</b> เนื่องจากเป็นระบบข้อสอบ ผู้ขอใช้งานจะต้องติดต่อมาทางไลน์ เพื่อขอสิทธิ์การใช้งานก่อนเข้าทำข้อสอบ</p>
+                <p><b>✨ ขั้นตอนสุดท้าย:</b> กดปุ่มด้านล่างเพื่อแจ้งขอยืนยันสิทธิ์ใน LINE เมื่อแอดมินกดคอนเฟิร์มในระบบ จะมีข้อความแจ้งเตือนส่งกลับไปยังแชทของคุณทันทีครับ</p>
               </div>
               <div class="reg-action-buttons">
                 <button type="button" class="btn btn-primary btn-block btn-rounded" id="regSendLineBtn">
-                  💬 เปิด LINE ส่งคำขอยืนยันสิทธิ์ทันที
+                  📱 แจ้งขอยืนยันสิทธิ์ใน LINE (คลิกเดียวส่งทันที)
                 </button>
                 <button type="button" class="btn btn-outline btn-block btn-rounded" id="regCopyLineIdBtn">
-                  📋 คัดลอกไอดีของคุณเพื่อส่งให้แอดมิน (@<span id="copyBtnUserDisplay"></span>)
+                  📋 คัดลอกข้อความขอยืนยันสิทธิ์ (@<span id="copyBtnUserDisplay"></span>)
                 </button>
                 <button type="button" class="btn btn-ghost btn-block btn-rounded" id="regBackToLoginBtn">
                   ← ไปที่หน้าเข้าสู่ระบบ
@@ -252,13 +252,23 @@ function renderLogin(initialTab = 'login') {
       e.preventDefault();
       const f = e.target, err = $('#loginErr');
       err.classList.add('hidden');
+      const enteredUsername = f.username.value.trim();
       try {
-        App.user = await Auth.login(f.username.value, f.password.value);
+        App.user = await Auth.login(enteredUsername, f.password.value);
         App.justLoggedIn = false; // ป้องกันป๊อปอัปเด้งกวนใจตอนล็อกอิน
         toast(`ยินดีต้อนรับ ${App.user.name || App.user.username}`, 'success');
         go('/home');
       } catch (ex) {
-        err.textContent = ex.message;
+        if (ex.message.includes('อนุมัติ') || ex.message.includes('ระงับ') || ex.message.includes('สิทธิ์') || ex.message.includes('หมดอายุ')) {
+          err.innerHTML = `<div>${esc(ex.message)}</div><div style="margin-top:8px"><button type="button" class="btn btn-primary btn-xs btn-rounded" id="quickVerifyLineBtn">📱 ทักแจ้งแอดมินใน LINE ทันที</button></div>`;
+          err.querySelector('#quickVerifyLineBtn')?.addEventListener('click', () => {
+            const msg = CloudSync.formatUserRequestMessage({ username: enteredUsername, name: '' });
+            navigator.clipboard?.writeText(msg);
+            window.open(CloudSync.getLineChatUrl(msg), '_blank', 'noopener');
+          });
+        } else {
+          err.textContent = ex.message;
+        }
         err.classList.remove('hidden');
       }
     };
@@ -315,6 +325,9 @@ function renderLogin(initialTab = 'login') {
         users.push(newUser);
         await Repo.saveUsers(users);
 
+        // ซิงค์คำขอสมัครสมาชิกขึ้นระบบ Cloud ทันที
+        CloudSync.registerRequest(newUser);
+
         // Show registration success screen
         $('#registerFormWrap').classList.add('hidden');
         $('#registerSuccessWrap').classList.remove('hidden');
@@ -322,13 +335,17 @@ function renderLogin(initialTab = 'login') {
         const copySpan = $('#copyBtnUserDisplay');
         if (copySpan) copySpan.textContent = username;
 
+        const reqMsg = CloudSync.formatUserRequestMessage({ username, name });
+
         $('#regSendLineBtn').onclick = () => {
-          showContactModal('verify', username);
+          navigator.clipboard?.writeText(reqMsg);
+          window.open(CloudSync.getLineChatUrl(reqMsg), '_blank', 'noopener');
+          toast('เปิด LINE ให้แล้ว กดส่งข้อความในแชทเพื่อขอยืนยันสิทธิ์ได้ทันทีครับ', 'success', 4500);
         };
 
         $('#regCopyLineIdBtn').onclick = () => {
-          navigator.clipboard?.writeText(username);
-          toast(`คัดลอกไอดี @${username} แล้ว แจ้งแอดมินทาง LINE ได้เลยครับ`, 'success');
+          navigator.clipboard?.writeText(reqMsg);
+          toast(`คัดลอกข้อความขอยืนยันสิทธิ์ @${username} แล้ว`, 'success');
         };
 
         $('#regBackToLoginBtn').onclick = () => {
@@ -342,7 +359,7 @@ function renderLogin(initialTab = 'login') {
           $('#loginForm [name=password]').focus();
         };
 
-        toast('สมัครสมาชิกเรียบร้อยแล้ว! กรุณาติดต่อแอดมินเพื่อขอเปิดสิทธิ์ใช้งาน', 'success', 5000);
+        toast('สมัครสมาชิกเรียบร้อยแล้ว! กดปุ่มแจ้งยืนยันสิทธิ์ใน LINE ได้เลยครับ', 'success', 5000);
       } catch (ex) {
         err.textContent = ex.message;
         err.classList.remove('hidden');

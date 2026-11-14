@@ -32,7 +32,10 @@ const DEFAULT_SETTINGS = {
   geminiKey: '',
   geminiModel: 'gemini-2.5-flash',
   aiAutoAnalyze: true,
-  announcement: ''
+  announcement: '',
+  gasUrl: 'https://script.google.com/macros/s/AKfycbxkMcpIuUGBajrTsvjl2ULUt1K7814WJ2gKS_ztYjP0IkXy9gpV0ahSb28Id3UZGjwt/exec',
+  lineBotId: '@430lkurz',
+  adminLineId: 'Panuwat_99999'
 };
 
 const DB = (() => {
