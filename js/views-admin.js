@@ -204,7 +204,7 @@ function pushLineMessage(toUserId, text) {
   } catch (err) {
     return false;
   }
-};
+}`;
 
 const NODE_BOT_SCRIPT_TEMPLATE = `const express = require('express');
 const line = require('@line/bot-sdk');
