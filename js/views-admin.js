@@ -524,7 +524,7 @@ async function adminOverview(el) {
 }
 
 /* ---------- Users ---------- */
-async function adminUsers(el) {
+async function adminUsers(el, skipInitialSync = false) {
   const users = await Repo.getUsers();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -561,11 +561,12 @@ async function adminUsers(el) {
       ${pendingList.length ? `<button type="button" class="btn btn-sm btn-filter-tab btn-outline" data-filter="pending" style="color:#d97706;border-color:#f59e0b;">⏳ รออนุมัติ (${pendingList.length})</button>` : ''}
     </div>
 
-    <div class="toolbar">
-      <input class="input" id="userSearch" placeholder="ค้นหาชื่อผู้ใช้ / ชื่อ…">
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
+      <input class="input" id="userSearch" placeholder="ค้นหาชื่อผู้ใช้ / ชื่อ…" style="min-width:200px;">
       <span class="spacer"></span>
-      <button class="btn btn-outline" id="syncCloudUsers" title="ดึงคำขอสมัครและยืนยันสิทธิ์จาก Google Sheet (อัปเดตอัตโนมัติทุก 10 วินาที)">
-        ☁️ ซิงค์จาก Cloud <span style="display:inline-block;width:7px;height:7px;background:#10b981;border-radius:50%;margin-left:4px;" title="ระบบตรวจจับคำขอใหม่อัตโนมัติ"></span>
+      <div id="cloudSyncStatusBadge" class="cloud-sync-badge"><span class="pulse-dot"></span> <span>ตรวจ Cloud อัตโนมัติ...</span></div>
+      <button class="btn btn-outline" id="syncCloudUsers" title="ดึงคำขอสมัครและยืนยันสิทธิ์จาก Google Sheet">
+        ☁️ ซิงค์จาก Cloud
       </button>
       <button class="btn btn-ghost" id="importUsers">นำเข้าผู้ใช้ (CSV)</button>
       <button class="btn btn-primary" id="addUser">+ เพิ่มผู้ใช้</button>
@@ -661,9 +662,15 @@ async function adminUsers(el) {
         throw new Error('ระบบ CloudSync กำลังโหลด กรุณารีเฟรชหน้าเว็บอีกครั้ง');
       }
       const res = await CloudSync.syncUsers();
-      if (res.added > 0 || res.updated > 0) {
-        toast(`ซิงค์ข้อมูลสำเร็จ! เพิ่มคำขอใหม่ ${res.added} คน, อัปเดต ${res.updated} คน`, 'success');
-        await adminUsers(el);
+      const badge = document.getElementById('cloudSyncStatusBadge');
+      if (badge) {
+        const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        badge.className = 'cloud-sync-badge synced';
+        badge.innerHTML = `<span class="pulse-dot"></span> <span>ตรงกับ Cloud แล้ว (${timeStr})</span>`;
+      }
+      if (res.added > 0 || res.updated > 0 || res.deleted > 0) {
+        toast(`ซิงค์ข้อมูลสำเร็จ! เพิ่มคำขอใหม่ ${res.added} คน, อัปเดต ${res.updated} คน, นำออก ${res.deleted || 0} คน`, 'success');
+        await adminUsers(el, true);
       } else {
         toast('ข้อมูลเป็นปัจจุบันแล้ว ไม่พบคำขอใหม่', 'info');
       }
@@ -676,43 +683,64 @@ async function adminUsers(el) {
     }
   };
 
-  // Auto-sync ทันทีเมื่อเข้าหน้านี้ หากมีผู้ใช้ใหม่จะอัปเดตตารางให้ทันที
-  if (!window._adminAutoSyncInit) {
-    window._adminAutoSyncInit = true;
-    setTimeout(async () => {
+  // สั่งตรวจสอบและซิงค์ Cloud ทันทีทุกครั้งที่เปิดหน้านี้ (แก้ปัญหามือถือข้อมูลไม่ตรงคอม)
+  if (!skipInitialSync) {
+    (async () => {
       try {
-        if (typeof CloudSync !== 'undefined') {
+        if (typeof CloudSync !== 'undefined' && !window._isSyncingActive) {
+          window._isSyncingActive = true;
           const res = await CloudSync.syncUsers();
-          if (res.added > 0 || res.updated > 0) {
-            await adminUsers(el);
+          const badge = document.getElementById('cloudSyncStatusBadge');
+          if (badge) {
+            const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+            badge.className = 'cloud-sync-badge synced';
+            badge.innerHTML = `<span class="pulse-dot"></span> <span>ตรงกับ Cloud แล้ว (${timeStr})</span>`;
+          }
+          if (res.added > 0 || res.updated > 0 || res.deleted > 0) {
+            await adminUsers(el, true);
           }
         }
-      } catch (e) {}
-    }, 400);
+      } catch (e) {
+        console.warn('Auto syncUsers on adminUsers error:', e);
+        const badge = document.getElementById('cloudSyncStatusBadge');
+        if (badge) {
+          badge.className = 'cloud-sync-badge error';
+          badge.innerHTML = '⚠️ แตะเพื่อซิงค์ใหม่';
+          badge.onclick = () => $('#syncCloudUsers')?.click();
+        }
+      } finally {
+        window._isSyncingActive = false;
+      }
+    })();
   }
 
-  // ระบบ Auto-Polling ดึงข้อมูลจาก Cloud ทุก 10 วินาทีอัตโนมัติ (ไม่ต้องคอยกดปุ่มซิงค์)
+  // ระบบ Auto-Polling ดึงข้อมูลจาก Cloud ทุก 6.5 วินาทีอัตโนมัติ (ข้ามอุปกรณ์เรียลไทม์)
   if (window._adminSyncTimer) clearInterval(window._adminSyncTimer);
   window._adminSyncTimer = setInterval(async () => {
     if (!document.getElementById('syncCloudUsers')) {
       clearInterval(window._adminSyncTimer);
       window._adminSyncTimer = null;
-      window._adminAutoSyncInit = false;
       return;
     }
     try {
-      if (typeof CloudSync !== 'undefined' && !window._isSyncingBackground) {
-        window._isSyncingBackground = true;
+      if (typeof CloudSync !== 'undefined' && !window._isSyncingActive) {
+        window._isSyncingActive = true;
         const res = await CloudSync.syncUsers();
-        if (res.added > 0 || res.updated > 0) {
-          toast(`🔔 มีคำขอใหม่ส่งเข้ามาจาก Cloud (${res.added} รายการ) อัปเดตตารางแล้ว!`, 'success', 3500);
-          await adminUsers(el);
+        const badge = document.getElementById('cloudSyncStatusBadge');
+        if (badge) {
+          const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+          badge.className = 'cloud-sync-badge synced';
+          badge.innerHTML = `<span class="pulse-dot"></span> <span>ตรงกับ Cloud แล้ว (${timeStr})</span>`;
+        }
+        if (res.added > 0 || res.updated > 0 || res.deleted > 0) {
+          toast(`🔔 ซิงค์ข้อมูลล่าสุดจาก Cloud แล้ว (เพิ่ม: ${res.added}, ปรับปรุง: ${res.updated || res.deleted})`, 'success', 3000);
+          await adminUsers(el, true);
         }
       }
     } catch (e) {} finally {
-      window._isSyncingBackground = false;
+      window._isSyncingActive = false;
     }
-  }, 10000);
+  }, 6500);
 
   $$('[data-edit]').forEach((b) => (b.onclick = () => userForm(users.find((u) => u.id === b.dataset.edit))));
   $$('[data-toggle]').forEach((c) => (c.onchange = async () => {
@@ -722,6 +750,9 @@ async function adminUsers(el) {
       updateData.perms = { '01': true, '02': true, '03': true, '04': true, '05': true, 'final': true };
     }
     await Repo.updateUser(c.dataset.toggle, updateData);
+    if (target && typeof CloudSync !== 'undefined' && CloudSync.updateUserStatus) {
+      CloudSync.updateUserStatus(target.username, c.checked).catch(console.warn);
+    }
     toast(c.checked ? 'เปิดใช้งานบัญชีและอนุญาตทุกชุดข้อสอบแล้ว' : 'ระงับบัญชีแล้ว', 'success');
   }));
   
@@ -1110,8 +1141,15 @@ async function userForm(user) {
         const perms = {}; b.querySelectorAll('[name=perm]').forEach((c) => (perms[c.value] = c.checked));
         const data = { name: val('name').value.trim(), role: u.id === App.user.id ? u.role : val('role').value, expires: val('expires').value, active: u.id === App.user.id ? true : val('active').checked, perms };
         if (isNew) {
-          users.push({ id: uid('u_'), username, ...data, passHash: await hashPassword(username, pw), mustChangePassword: false, createdAt: Date.now(), lastLogin: null });
+          const newUser = { id: uid('u_'), username, ...data, passHash: await hashPassword(username, pw), mustChangePassword: false, createdAt: Date.now(), lastLogin: null };
+          users.push(newUser);
           await Repo.saveUsers(users);
+          if (typeof CloudSync !== 'undefined' && CloudSync.registerRequest) {
+            CloudSync.registerRequest(newUser).catch(console.warn);
+            if (newUser.active) {
+              CloudSync.confirmUser({ username: newUser.username, name: newUser.name, packageTitle: 'แอดมินกำหนดเอง', expires: newUser.expires }).catch(console.warn);
+            }
+          }
         } else {
           if (pw) {
             data.passHash = await hashPassword(u.username, pw);
@@ -1123,6 +1161,9 @@ async function userForm(user) {
             }
           }
           await Repo.updateUser(u.id, data);
+          if (typeof CloudSync !== 'undefined' && CloudSync.updateUser) {
+            CloudSync.updateUser(u.username, data).catch(console.warn);
+          }
         }
         return true;
       }
