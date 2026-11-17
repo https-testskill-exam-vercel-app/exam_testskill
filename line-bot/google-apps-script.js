@@ -328,6 +328,22 @@ ${WEB_APP_URL}#/admin/users`);
       sheet.getRange(foundRow, 7).setValue(expires || 'ตลอดชีพ');
       sheet.getRange(foundRow, 11).setValue(now);
       if (name) sheet.getRange(foundRow, 3).setValue(name);
+    } else {
+      // หากไม่มีแถวเดิมใน Sheet ให้เพิ่มแถวใหม่พร้อมสถานะ active ทันที
+      sheet.appendRow([
+        'u_' + Date.now(),
+        cleanUser,
+        name || cleanUser,
+        'user',
+        'active',
+        pkgTitle,
+        expires || 'ตลอดชีพ',
+        '', // LINE User ID
+        '', // LINE Name
+        now,
+        now,
+        ''  // Pass_Hash
+      ]);
     }
 
     // ถ้าระบบมี LINE User ID ของผู้ใช้คนนี้แล้ว -> ยิงข้อความแจ้งเตือนอัตโนมัติเข้า LINE ทันที!

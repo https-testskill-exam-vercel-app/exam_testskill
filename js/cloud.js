@@ -296,6 +296,40 @@ const CloudSync = {
   },
 
   /**
+   * บันทึกรายการที่แอดมินเพิ่งกดคอนเฟิร์ม/เปิดสิทธิ์ เพื่อป้องกัน Cloud Lag แล้วดึงสถานะเก่ามาทับจนเด้งกลับ
+   */
+  _recentAdminActions: new Map(),
+
+  recordUserAction(username, active) {
+    const cleanUser = String(username || '').replace(/^@+/, '').trim().toLowerCase();
+    const entry = {
+      active: !!active,
+      pendingApproval: false,
+      timestamp: Date.now()
+    };
+    this._recentAdminActions.set(cleanUser, entry);
+    try {
+      localStorage.setItem('kf_recent_act_' + cleanUser, JSON.stringify(entry));
+    } catch (e) {}
+  },
+
+  getRecentUserAction(username) {
+    const cleanUser = String(username || '').replace(/^@+/, '').trim().toLowerCase();
+    let act = this._recentAdminActions.get(cleanUser);
+    if (!act) {
+      try {
+        const raw = localStorage.getItem('kf_recent_act_' + cleanUser);
+        if (raw) act = JSON.parse(raw);
+      } catch (e) {}
+    }
+    // ให้สิทธิ์ที่แอดมินเพิ่งกดมีผลคุ้มครอง 60 วินาที เพื่อรอ Google Sheet ประมวลผลเสร็จ
+    if (act && (Date.now() - act.timestamp < 60000)) {
+      return act;
+    }
+    return null;
+  },
+
+  /**
    * อัปเดตข้อมูลหรือสถานะผู้ใช้ไปยัง Cloud (Google Sheet) รองรับทั้งคอมและมือถือ
    */
   async updateUser(username, updateData = {}) {
@@ -338,14 +372,23 @@ const CloudSync = {
   },
 
   /**
-   * สั่งเปิด/ปิดการใช้งานบัญชีไปยัง Cloud
+   * สั่งเปิด/ปิดการใช้งานบัญชีไปยัง Cloud (รองรับ Apps Script ทุกเวอร์ชัน 100%)
    */
   async updateUserStatus(username, active) {
-    return this.updateUser(username, { active: !!active, pendingApproval: false });
+    this.recordUserAction(username, active);
+    if (active) {
+      return this.confirmUser({
+        username,
+        name: username,
+        packageTitle: 'แพ็กเกจมาตรฐาน',
+        expires: ''
+      });
+    }
+    return this.updateUser(username, { active: false, pendingApproval: false });
   },
 
   /**
-   * ซิงค์ผู้ใช้จาก Cloud เข้ามาผสานกับ IndexedDB ในเครื่อง (แก้ปัญหาข้อมูลไม่อัปเดตข้ามอุปกรณ์)
+   * ซิงค์ผู้ใช้จาก Cloud เข้ามาผสานกับ IndexedDB ในเครื่อง (แก้ปัญหาข้อมูลไม่อัปเดตข้ามอุปกรณ์และป้องกันเด้งกลับ)
    */
   async syncUsers() {
     // ล้าง deleted_users เก่าทิ้ง เพื่อไม่ให้มีบัญชีไหนถูกบล็อกถาวร
@@ -378,14 +421,31 @@ const CloudSync = {
           local.role = cu.role;
           changed = true;
         }
-        if (cu.active !== undefined && cu.active !== local.active) {
-          local.active = !!cu.active;
-          changed = true;
+
+        // ตรวจสอบความปลอดภัย: ป้องกัน Cloud Lag ที่ส่ง active:false เก่ามาทับรายการที่แอดมินเพิ่งเปิดสิทธิ์
+        const recentAction = this.getRecentUserAction(cleanUser);
+        if (recentAction) {
+          if (local.active !== recentAction.active || local.pendingApproval !== recentAction.pendingApproval) {
+            local.active = recentAction.active;
+            local.pendingApproval = recentAction.pendingApproval;
+            changed = true;
+          }
+          // ถ้า Cloud อัปเดตเป็น active ตรงกับแอดมินแล้ว เคลียร์ tracker ได้
+          if (cu.active === recentAction.active) {
+            this._recentAdminActions.delete(cleanUser);
+            try { localStorage.removeItem('kf_recent_act_' + cleanUser); } catch (e) {}
+          }
+        } else {
+          if (cu.active !== undefined && cu.active !== local.active) {
+            local.active = !!cu.active;
+            changed = true;
+          }
+          if (cu.pendingApproval !== undefined && cu.pendingApproval !== local.pendingApproval) {
+            local.pendingApproval = !!cu.pendingApproval;
+            changed = true;
+          }
         }
-        if (cu.pendingApproval !== undefined && cu.pendingApproval !== local.pendingApproval) {
-          local.pendingApproval = !!cu.pendingApproval;
-          changed = true;
-        }
+
         if (cu.package && cu.package !== local.package) {
           local.package = cu.package;
           changed = true;
@@ -398,7 +458,7 @@ const CloudSync = {
           local.lineUserId = cu.lineUserId;
           changed = true;
         }
-        // แก้ไข: หากใน Cloud มี passHash ใหม่ ให้อัปเดตเข้า local ทันที (ข้ามเครื่องได้เสถียร)
+        // หากใน Cloud มี passHash ใหม่ ให้อัปเดตเข้า local ทันที
         if (cu.passHash && cu.passHash !== local.passHash) {
           local.passHash = cu.passHash;
           changed = true;

@@ -223,6 +223,8 @@ function handleWebApiAction(payload) {
       sheet.getRange(foundRow, 7).setValue(expires || 'ตลอดชีพ');
       sheet.getRange(foundRow, 11).setValue(now);
       if (name) sheet.getRange(foundRow, 3).setValue(name);
+    } else {
+      sheet.appendRow(['u_' + Date.now(), cleanUser, name || cleanUser, 'user', 'active', pkgTitle, expires || 'ตลอดชีพ', '', '', now, now, '']);
     }
 
     let lineSent = false;
@@ -781,15 +783,18 @@ async function adminUsers(el, skipInitialSync = false) {
   $$('[data-edit]').forEach((b) => (b.onclick = () => userForm(users.find((u) => u.id === b.dataset.edit))));
   $$('[data-toggle]').forEach((c) => (c.onchange = async () => {
     const target = users.find((u) => u.id === c.dataset.toggle);
+    if (!target) return;
     const updateData = { active: c.checked, pendingApproval: false };
     if (c.checked && (!target?.perms || Object.keys(target.perms).length === 0)) {
       updateData.perms = { '01': true, '02': true, '03': true, '04': true, '05': true, 'final': true };
     }
     await Repo.updateUser(c.dataset.toggle, updateData);
-    if (target && typeof CloudSync !== 'undefined' && CloudSync.updateUserStatus) {
+    if (typeof CloudSync !== 'undefined') {
+      CloudSync.recordUserAction(target.username, c.checked);
       CloudSync.updateUserStatus(target.username, c.checked).catch(console.warn);
     }
     toast(c.checked ? 'เปิดใช้งานบัญชีและอนุญาตทุกชุดข้อสอบแล้ว' : 'ระงับบัญชีแล้ว', 'success');
+    await adminUsers(el, true);
   }));
   
   // กดอนุมัติสิทธิ์ → เปิดหน้าต่างเลือกแพ็กเกจ
@@ -797,7 +802,7 @@ async function adminUsers(el, skipInitialSync = false) {
     const targetUser = users.find((u) => u.id === b.dataset.approve);
     if (!targetUser) return;
     const ok = await packageApprovalDialog(targetUser, 'approve');
-    if (ok) await adminUsers(el);
+    if (ok) await adminUsers(el, true);
   }));
 
   // กดต่ออายุ → เปิดหน้าต่างต่ออายุ/ขยายวัน
@@ -805,7 +810,7 @@ async function adminUsers(el, skipInitialSync = false) {
     const targetUser = users.find((u) => u.id === b.dataset.renew);
     if (!targetUser) return;
     const ok = await packageApprovalDialog(targetUser, 'renew');
-    if (ok) await adminUsers(el);
+    if (ok) await adminUsers(el, true);
   }));
 
   $$('[data-del]').forEach((b) => (b.onclick = async () => {
@@ -962,6 +967,9 @@ async function packageApprovalDialog(user, mode = 'approve') {
             expires: finalExpires,
             perms
           });
+          if (typeof CloudSync !== 'undefined') {
+            CloudSync.recordUserAction(user.username, true);
+          }
 
           const pkgName = {
             trial: 'แบบทดลองใช้ (30 วัน)',
