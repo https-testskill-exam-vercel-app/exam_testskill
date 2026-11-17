@@ -2,7 +2,7 @@
  * LINE Messaging API Webhook & Cloud Backend - Google Apps Script (24/7 Serverless)
  * ระบบตอบกลับอัตโนมัติ 4 หัวข้อ + ฐานข้อมูลผู้ใช้ + ระบบคอนเฟิร์มสิทธิ์และตอบกลับอัตโนมัติ
  *
- * เจ้าของระบบ: คุณภาณุวัฒน์ (Line ID: Panuwat_99999)
+ * เจ้าของระบบ: คุณภานุวัฒน์ (Line ID: Panuwat_99999)
  * LINE Bot ID: @430lkurz
  * Web Application: https://https-testskill-exam-vercel-app.github.io/exam_testskill/
  */
@@ -107,7 +107,7 @@ function doGet(e) {
         name: (e.parameter.name || '').trim(),
         packageTitle: (e.parameter.package || e.parameter.packageTitle || 'แพ็กเกจมาตรฐาน').trim(),
         expires: (e.parameter.expires || '').trim(),
-        adminName: (e.parameter.adminName || 'ภาณุวัฒน์').trim()
+        adminName: (e.parameter.adminName || 'ภานุวัฒน์').trim()
       };
       return handleWebApiAction(payload);
     }
@@ -554,13 +554,13 @@ function handleLineTextMessage(event) {
   const lower = userText.toLowerCase();
   const lineUserId = (event.source && event.source.userId) || '';
 
-  // 0. คำสั่งเชื่อมต่อบัญชี LINE ของแอดมินหลัก (คุณภาณุวัฒน์)
+  // 0. คำสั่งเชื่อมต่อบัญชี LINE ของแอดมินหลัก (คุณภานุวัฒน์)
   if (lower === 'แอดมิน' || lower === 'admin' || lower === 'ลงทะเบียนแอดมิน' || lower === 'iamadmin' || lower === 'myid') {
     setAdminLineUserId(lineUserId);
     const replyText =
 `🛡️ [เชื่อมต่อ LINE แอดมินหลักสำเร็จ!]
 
-สวัสดีคุณภาณุวัฒน์ 👋
+สวัสดีคุณภานุวัฒน์ 👋
 ระบบได้ผูกบัญชี LINE นี้เป็น [ผู้ดูแลระบบหลัก] เรียบร้อยแล้ว!
 (LINE User ID: ${lineUserId})
 
@@ -610,7 +610,7 @@ function handleLineTextMessage(event) {
 สวัสดีคุณ ${displayName} 👋
 ระบบได้บันทึกคำขอและเชื่อมต่อบัญชี LINE กับไอดี ${extractedUser} เข้าหน้าจัดการของแอดมินเรียบร้อยแล้ว!
 
-⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) ยืนยันสิทธิ์
+⏳ สถานะ: รอแอดมิน (คุณภานุวัฒน์) ยืนยันสิทธิ์
 เมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊`;
 
     // ส่งแจ้งเตือนแอดมินเข้า LINE หลักทันที
@@ -642,7 +642,7 @@ ${WEB_APP_URL}#/admin/users`);
 `🔑 [ได้รับคำขอยืนยันสิทธิ์ของ ${displayName} แล้ว]
 
 สวัสดีคุณ ${displayName} 👋
-ระบบได้รับคำขอยืนยันสิทธิ์ของคุณ และส่งตรงเข้าหน้าจัดการของแอดมิน (คุณภาณุวัฒน์) เรียบร้อยแล้ว!
+ระบบได้รับคำขอยืนยันสิทธิ์ของคุณ และส่งตรงเข้าหน้าจัดการของแอดมิน (คุณภานุวัฒน์) เรียบร้อยแล้ว!
 
 📝 ไอดีของคุณในระบบคือ: ${autoUsername}
 (หรือหากท่านสมัครไอดีไว้ในเว็บแล้ว สามารถพิมพ์แจ้งไอดี เช่น "ID: Banana009" ในแชทนี้เพื่อเชื่อมต่อไอดีได้เลยครับ)
@@ -773,7 +773,7 @@ function replyVerification(replyToken, text) {
 
 (หากยังไม่ได้สมัครสมาชิก สามารถกดสมัครได้ที่เว็บ: ${WEB_APP_URL}#/register)
 
-เมื่อแอดมิน (คุณภาณุวัฒน์) กดยืนยันในระบบ จะมีข้อความแจ้งเตือนอัตโนมัติส่งกลับมาที่นี่ทันที!`;
+เมื่อแอดมิน (คุณภานุวัฒน์) กดยืนยันในระบบ จะมีข้อความแจ้งเตือนอัตโนมัติส่งกลับมาที่นี่ทันที!`;
 
   sendLineReply(replyToken, [
     { type: 'text', text: replyText, quickReply: getQuickReplyMenu() }
@@ -785,7 +785,7 @@ function replyDeveloper(replyToken) {
 `👨‍💻 [2. ติดต่อผู้พัฒนาระบบ TestSkill]
 
 คุณกำลังติดต่อผู้สร้างและพัฒนาระบบโดยตรง:
-• ผู้พัฒนา: คุณภาณุวัฒน์ (แอดมิน)
+• ผู้พัฒนา: คุณภานุวัฒน์ (แอดมิน)
 • Line ID ส่วนตัว: Panuwat_99999
 • ระบบสอบออนไลน์เตรียมความพร้อมใบประกอบวิชาชีพครู By กลางฟู
 
@@ -834,7 +834,7 @@ function replyMainMenu(replyToken, userText) {
 
 กรุณาเลือกหัวข้อที่ต้องการรับบริการ:
 1️⃣ ยืนยันสิทธิ์ (ขอเปิดสิทธิ์ / ต่ออายุ)
-2️⃣ ติดต่อผู้พัฒนา (คุณภาณุวัฒน์)
+2️⃣ ติดต่อผู้พัฒนา (คุณภานุวัฒน์)
 3️⃣ แจ้งปัญหาการใช้งาน
 4️⃣ สอบถาม อื่นๆ
 
@@ -924,7 +924,7 @@ function pushLineMessage(toUserId, text) {
 }
 
 // ----------------------------------------------------
-// ระบบแจ้งเตือนตรงเข้า LINE แอดมินหลัก (คุณภาณุวัฒน์)
+// ระบบแจ้งเตือนตรงเข้า LINE แอดมินหลัก (คุณภานุวัฒน์)
 // ----------------------------------------------------
 function getAdminLineUserId() {
   // 1. ดึงจาก Script Properties

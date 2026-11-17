@@ -211,7 +211,7 @@ const CloudSync = {
   /**
    * สั่งคอนเฟิร์มผู้ใช้งานใน Cloud และสั่งให้ LINE Bot ส่งข้อความตอบกลับเข้าแชทผู้ใช้ทันที
    */
-  async confirmUser({ username, name, packageTitle, expires, adminName = 'ภาณุวัฒน์' }) {
+  async confirmUser({ username, name, packageTitle, expires, adminName = 'ภานุวัฒน์' }) {
     const url = this.getGasUrl();
     if (!url) return { ok: false, lineSent: false, hasLineId: false };
     const cleanUser = String(username || '').replace(/^@+/, '').trim();
@@ -387,7 +387,7 @@ const CloudSync = {
         name: extra.name || username,
         packageTitle: extra.package || 'แพ็กเกจมาตรฐาน',
         expires: extra.expires || '',
-        adminName: extra.adminName || 'ภาณุวัฒน์'
+        adminName: extra.adminName || 'ภานุวัฒน์'
       });
     }
     return this.updateUser(username, {
@@ -636,7 +636,7 @@ ${webUrl}
   },
 
   /**
-   * ลิงก์เปิดแชท LINE ส่วนตัวของผู้พัฒนา (คุณภาณุวัฒน์)
+   * ลิงก์เปิดแชท LINE ส่วนตัวของผู้พัฒนา (คุณภานุวัฒน์)
    */
   getAdminPersonalLineUrl() {
     return `https://line.me/ti/p/~${this.getAdminLineId()}`;

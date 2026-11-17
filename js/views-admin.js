@@ -78,7 +78,7 @@ function doGet(e) {
         name: (e.parameter.name || '').trim(),
         packageTitle: (e.parameter.package || e.parameter.packageTitle || 'แพ็กเกจมาตรฐาน').trim(),
         expires: (e.parameter.expires || '').trim(),
-        adminName: (e.parameter.adminName || 'ภาณุวัฒน์').trim()
+        adminName: (e.parameter.adminName || 'ภานุวัฒน์').trim()
       });
     }
     if (action === 'delete_user') {
@@ -342,7 +342,7 @@ function handleLineTextMessage(event) {
   // คำสั่งผูก LINE แอดมินหลัก
   if (lower === 'แอดมิน' || lower === 'admin' || lower === 'ลงทะเบียนแอดมิน' || lower === 'iamadmin' || lower === 'myid') {
     setAdminLineUserId(lineUserId);
-    const replyText = "🛡️ [เชื่อมต่อ LINE แอดมินหลักสำเร็จ!]\\n\\nสวัสดีคุณภาณุวัฒน์ 👋\\nระบบได้ผูกบัญชี LINE นี้เป็น [ผู้ดูแลระบบหลัก] เรียบร้อยแล้ว!\\n(User ID: " + lineUserId + ")\\n\\n🔔 ต่อจากนี้เมื่อมี:\\n• สมาชิกสมัครใหม่ผ่านหน้าเว็บ\\n• ผู้ใช้ส่งคำขอเปิดสิทธิ์ / ต่ออายุ\\n• ผู้ใช้แจ้งปัญหาการใช้งาน\\n• ข้อความสอบถามอื่นๆ\\n\\nระบบจะส่งข้อความแจ้งเตือนเด้งเข้าแชทนี้ทันทีตลอด 24 ชั่วโมงครับ ✨";
+    const replyText = "🛡️ [เชื่อมต่อ LINE แอดมินหลักสำเร็จ!]\\n\\nสวัสดีคุณภานุวัฒน์ 👋\\nระบบได้ผูกบัญชี LINE นี้เป็น [ผู้ดูแลระบบหลัก] เรียบร้อยแล้ว!\\n(User ID: " + lineUserId + ")\\n\\n🔔 ต่อจากนี้เมื่อมี:\\n• สมาชิกสมัครใหม่ผ่านหน้าเว็บ\\n• ผู้ใช้ส่งคำขอเปิดสิทธิ์ / ต่ออายุ\\n• ผู้ใช้แจ้งปัญหาการใช้งาน\\n• ข้อความสอบถามอื่นๆ\\n\\nระบบจะส่งข้อความแจ้งเตือนเด้งเข้าแชทนี้ทันทีตลอด 24 ชั่วโมงครับ ✨";
     return sendLineReply(replyToken, [{ type: 'text', text: replyText }]);
   }
 
@@ -365,7 +365,7 @@ function handleLineTextMessage(event) {
   if (extractedUser) {
     const resolvedName = linkLineUserWithUsername(extractedUser, lineUserId, finalName);
     const displayName = resolvedName || finalName || extractedUser;
-    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดีคุณ " + displayName + " 👋\\nระบบได้บันทึกคำขอและเชื่อมต่อบัญชี LINE กับไอดี " + extractedUser + " เข้าหน้าจัดการของแอดมินเรียบร้อยแล้ว!\\n\\n⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) ยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊";
+    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดีคุณ " + displayName + " 👋\\nระบบได้บันทึกคำขอและเชื่อมต่อบัญชี LINE กับไอดี " + extractedUser + " เข้าหน้าจัดการของแอดมินเรียบร้อยแล้ว!\\n\\n⏳ สถานะ: รอแอดมิน (คุณภานุวัฒน์) ยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊";
     if (lineUserId !== getAdminLineUserId()) {
       notifyAdmin("🔑 [แจ้งเตือน: มีคำขอเปิดสิทธิ์ใช้งาน]\\n👤 ไอดี: @" + extractedUser + "\\n📱 ชื่อ LINE: " + displayName + "\\n👉 จัดการสิทธิ์ได้ที่: " + WEB_APP_URL + "#/admin/users");
     }
@@ -376,7 +376,7 @@ function handleLineTextMessage(event) {
     const autoUsername = 'line_' + (lineUserId ? lineUserId.slice(-6) : Date.now().toString().slice(-6));
     const resolvedName = linkLineUserWithUsername(autoUsername, lineUserId, finalName);
     const displayName = resolvedName || finalName || autoUsername;
-    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดีคุณ " + displayName + " 👋\\nระบบได้รับคำขอยืนยันสิทธิ์ของคุณ และส่งตรงเข้าหน้าจัดการของแอดมิน (คุณภาณุวัฒน์) เรียบร้อยแล้ว!\\n\\n📝 ไอดีของคุณในระบบคือ: " + autoUsername + "\\n(หรือหากท่านสมัครไอดีไว้ในเว็บแล้ว สามารถพิมพ์แจ้งไอดี เช่น \\"ID: Banana009\\" ในแชทนี้เพื่อเชื่อมต่อไอดีได้เลยครับ)\\n\\n⏳ สถานะ: รอแอดมินตรวจสอบและยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนอัตโนมัติกลับมายังแชทนี้ทันที 😊";
+    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดีคุณ " + displayName + " 👋\\nระบบได้รับคำขอยืนยันสิทธิ์ของคุณ และส่งตรงเข้าหน้าจัดการของแอดมิน (คุณภานุวัฒน์) เรียบร้อยแล้ว!\\n\\n📝 ไอดีของคุณในระบบคือ: " + autoUsername + "\\n(หรือหากท่านสมัครไอดีไว้ในเว็บแล้ว สามารถพิมพ์แจ้งไอดี เช่น \\"ID: Banana009\\" ในแชทนี้เพื่อเชื่อมต่อไอดีได้เลยครับ)\\n\\n⏳ สถานะ: รอแอดมินตรวจสอบและยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนอัตโนมัติกลับมายังแชทนี้ทันที 😊";
     if (lineUserId !== getAdminLineUserId()) {
       notifyAdmin("🔑 [แจ้งเตือน: มีคำขอยืนยันสิทธิ์ใหม่]\\n👤 ไอดีชั่วคราว: @" + autoUsername + "\\n📱 ชื่อ LINE: " + displayName + "\\n👉 จัดการสิทธิ์ได้ที่: " + WEB_APP_URL + "#/admin/users");
     }
@@ -385,7 +385,7 @@ function handleLineTextMessage(event) {
     if (lineUserId !== getAdminLineUserId()) {
       notifyAdmin("👨‍💻 [แจ้งเตือน: มีผู้ใช้ติดต่อผู้พัฒนา]\\n📱 จาก: " + (displayName || lineUserId) + "\\n💬 ข้อความ:\\n\\"" + userText + "\\"");
     }
-    sendLineReply(replyToken, [{ type: 'text', text: "👨‍💻 [2. ติดต่อผู้พัฒนาระบบ TestSkill]\\n\\nคุณกำลังติดต่อผู้สร้างและพัฒนาระบบโดยตรง:\\n• ผู้พัฒนา: คุณภาณุวัฒน์ (แอดมิน)\\n• Line ID ส่วนตัว: Panuwat_99999\\n• ระบบสอบออนไลน์เตรียมความพร้อมใบประกอบวิชาชีพครู By กลางฟู\\n\\nท่านสามารถพิมพ์ข้อความ ข้อเสนอแนะ หรือคำถามทิ้งไว้ในแชทนี้ได้เลย แอดมินจะรีบเข้ามาตอบกลับโดยเร็วที่สุด 😊", quickReply: getQuickReplyMenu() }]);
+    sendLineReply(replyToken, [{ type: 'text', text: "👨‍💻 [2. ติดต่อผู้พัฒนาระบบ TestSkill]\\n\\nคุณกำลังติดต่อผู้สร้างและพัฒนาระบบโดยตรง:\\n• ผู้พัฒนา: คุณภานุวัฒน์ (แอดมิน)\\n• Line ID ส่วนตัว: Panuwat_99999\\n• ระบบสอบออนไลน์เตรียมความพร้อมใบประกอบวิชาชีพครู By กลางฟู\\n\\nท่านสามารถพิมพ์ข้อความ ข้อเสนอแนะ หรือคำถามทิ้งไว้ในแชทนี้ได้เลย แอดมินจะรีบเข้ามาตอบกลับโดยเร็วที่สุด 😊", quickReply: getQuickReplyMenu() }]);
   } else if (lower.startsWith('3') || lower.includes('ปัญหา') || lower.includes('บั๊ก') || lower.includes('bug')) {
     if (lineUserId !== getAdminLineUserId()) {
       notifyAdmin("🛠️ [แจ้งเตือน: มีผู้ใช้แจ้งปัญหาการใช้งาน]\\n📱 จาก: " + (displayName || lineUserId) + "\\n💬 ข้อความ:\\n\\"" + userText + "\\"");
@@ -438,7 +438,7 @@ function linkLineUserWithUsername(username, lineUserId, name = '') {
 }
 
 function replyMainMenu(replyToken) {
-  const msg = "สวัสดี 👋 ยินดีต้อนรับสู่ LINE Official ของระบบ TestSkill (By กลางฟู)\\n\\nกรุณาเลือกหัวข้อที่ต้องการรับบริการ:\\n1️⃣ ยืนยันสิทธิ์ (ขอเปิดสิทธิ์ / ต่ออายุ)\\n2️⃣ ติดต่อผู้พัฒนา (คุณภาณุวัฒน์)\\n3️⃣ แจ้งปัญหาการใช้งาน\\n4️⃣ สอบถาม อื่นๆ\\n\\n👉 พิมพ์หมายเลข 1, 2, 3 หรือ 4 หรือพิมพ์ ID ของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันที";
+  const msg = "สวัสดี 👋 ยินดีต้อนรับสู่ LINE Official ของระบบ TestSkill (By กลางฟู)\\n\\nกรุณาเลือกหัวข้อที่ต้องการรับบริการ:\\n1️⃣ ยืนยันสิทธิ์ (ขอเปิดสิทธิ์ / ต่ออายุ)\\n2️⃣ ติดต่อผู้พัฒนา (คุณภานุวัฒน์)\\n3️⃣ แจ้งปัญหาการใช้งาน\\n4️⃣ สอบถาม อื่นๆ\\n\\n👉 พิมพ์หมายเลข 1, 2, 3 หรือ 4 หรือพิมพ์ ID ของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันที";
   sendLineReply(replyToken, [{ type: 'text', text: msg, quickReply: getQuickReplyMenu() }]);
 }
 
@@ -541,7 +541,7 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
       const text = event.message.text.trim();
       let reply = 'สวัสดีครับ เลือกหัวข้อ:\\n1. ยืนยันสิทธิ์\\n2. ติดต่อผู้พัฒนา\\n3. แจ้งปัญหา\\n4. สอบถาม อื่นๆ';
       if (text.startsWith('1')) reply = '🔑 [ยืนยันสิทธิ์] กรุณาแจ้งไอดีผู้ใช้ และแพ็กเกจที่ต้องการ (30 วัน / 3 เดือน / ตลอดชีพ)';
-      else if (text.startsWith('2')) reply = '👨‍💻 [ติดต่อผู้พัฒนา] ติดต่อคุณภาณุวัฒน์ Line ID: Panuwat_99999 พิมพ์ข้อความทิ้งไว้ได้เลยครับ';
+      else if (text.startsWith('2')) reply = '👨‍💻 [ติดต่อผู้พัฒนา] ติดต่อคุณภานุวัฒน์ Line ID: Panuwat_99999 พิมพ์ข้อความทิ้งไว้ได้เลยครับ';
       else if (text.startsWith('3')) reply = '🛠️ [แจ้งปัญหา] กรุณาระบุชุดข้อสอบ ข้อที่พบปัญหา และรายละเอียด';
       else if (text.startsWith('4')) reply = '❓ [สอบถาม] คลังข้อสอบ 2,295 ข้อ สอบถามรายละเอียดเพิ่มเติมได้เลยครับ';
       return client.replyMessage({ replyToken: event.replyToken, messages: [{ type: 'text', text: reply }] });
@@ -1034,7 +1034,7 @@ async function packageApprovalDialog(user, mode = 'approve') {
             name: user.name,
             packageTitle: pkgName,
             expires: finalExpires,
-            adminName: App.user?.name || 'ภาณุวัฒน์'
+            adminName: App.user?.name || 'ภานุวัฒน์'
           });
 
           if (syncRes?.lineSent) {
@@ -1555,7 +1555,7 @@ async function adminSettings(el) {
       <b>4 หัวข้อตอบกลับอัตโนมัติในแชท LINE:</b>
       <div class="line-bot-topics-list">
         <div class="bot-topic-item"><span class="bot-topic-num">1</span> <div><b>ยืนยันสิทธิ์:</b> ผู้ใช้ส่งไอดีมาขอเปิดสิทธิ์หรือต่ออายุ (บอทแนะนำขั้นตอนและแจ้งผู้ดูแล)</div></div>
-        <div class="bot-topic-item"><span class="bot-topic-num">2</span> <div><b>ติดต่อผู้พัฒนา:</b> ปรึกษาและส่งเรื่องตรงถึงคุณภาณุวัฒน์</div></div>
+        <div class="bot-topic-item"><span class="bot-topic-num">2</span> <div><b>ติดต่อผู้พัฒนา:</b> ปรึกษาและส่งเรื่องตรงถึงคุณภานุวัฒน์</div></div>
         <div class="bot-topic-item"><span class="bot-topic-num">3</span> <div><b>แจ้งปัญหาการใช้งาน:</b> รับเรื่องข้อสอบผิดพลาด หรือระบบขัดข้อง</div></div>
         <div class="bot-topic-item"><span class="bot-topic-num">4</span> <div><b>สอบถาม อื่นๆ:</b> ถามข้อมูลเพิ่มเติม และคำถามที่พบบ่อย (FAQ)</div></div>
       </div>

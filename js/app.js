@@ -275,7 +275,7 @@ function showContactModal(initialTopic = 'verify', customUsername = '') {
       title: '2. ติดต่อผู้พัฒนา',
       desc: 'ปรึกษาและพูดคุยกับผู้พัฒนาโดยตรง',
       badge: '👨‍💻 ผู้พัฒนา',
-      template: (u) => `2. ติดต่อผู้พัฒนา - ติดต่อคุณภาณุวัฒน์ (ผู้สร้างระบบ TestSkill)
+      template: (u) => `2. ติดต่อผู้พัฒนา - ติดต่อคุณภานุวัฒน์ (ผู้สร้างระบบ TestSkill)
 ชื่อผู้ใช้: @${u || '-'}
 เรื่องที่ต้องการติดต่อ: `
     },
@@ -358,7 +358,7 @@ function showContactModal(initialTopic = 'verify', customUsername = '') {
           <button type="button" class="btn btn-outline" id="btnCopyLineIdOnly">
             📋 คัดลอกไอดีบอท (@430lkurz)
           </button>
-          <a class="btn btn-ghost" href="https://line.me/ti/p/~Panuwat_99999" target="_blank" rel="noopener" title="แอดไลน์แอดมินคุณภาณุวัฒน์โดยตรง">
+          <a class="btn btn-ghost" href="https://line.me/ti/p/~Panuwat_99999" target="_blank" rel="noopener" title="แอดไลน์แอดมินคุณภานุวัฒน์โดยตรง">
             คุยกับแอดมินโดยตรง (Panuwat_99999) ↗
           </a>
         </div>

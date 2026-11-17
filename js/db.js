@@ -88,7 +88,7 @@ const Repo = {
       existingUsers.push({
         id: 'u_panuwat',
         username: 'Panuwat',
-        name: 'ภาณุวัฒน์ (ผู้ดูแลระบบ)',
+        name: 'ภานุวัฒน์ (ผู้ดูแลระบบ)',
         passHash: panuwatHash,
         role: 'admin',
         active: true,
@@ -99,12 +99,20 @@ const Repo = {
         lastLogin: null
       });
       await DB.set('users', existingUsers);
-    } else if (pUser.role !== 'admin' || !pUser.active || pUser.passHash !== panuwatHash) {
-      pUser.role = 'admin';
-      pUser.active = true;
-      pUser.passHash = panuwatHash;
-      pUser.mustChangePassword = false;
-      await DB.set('users', existingUsers);
+    } else {
+      let changed = false;
+      if (pUser.role !== 'admin' || !pUser.active || pUser.passHash !== panuwatHash) {
+        pUser.role = 'admin';
+        pUser.active = true;
+        pUser.passHash = panuwatHash;
+        pUser.mustChangePassword = false;
+        changed = true;
+      }
+      if (pUser.name !== 'ภานุวัฒน์ (ผู้ดูแลระบบ)') {
+        pUser.name = 'ภานุวัฒน์ (ผู้ดูแลระบบ)';
+        changed = true;
+      }
+      if (changed) await DB.set('users', existingUsers);
     }
 
     if (await DB.get('seeded')) {
@@ -138,7 +146,7 @@ const Repo = {
     const adminHash = await hashPassword('admin', 'admin1234');
     await DB.set('users', [
       {
-        id: 'u_panuwat', username: 'Panuwat', name: 'ภาณุวัฒน์ (ผู้ดูแลระบบ)', passHash: panuwatHash, role: 'admin',
+        id: 'u_panuwat', username: 'Panuwat', name: 'ภานุวัฒน์ (ผู้ดูแลระบบ)', passHash: panuwatHash, role: 'admin',
         active: true, expires: '', perms: {}, mustChangePassword: false, createdAt: Date.now(), lastLogin: null
       },
       {
