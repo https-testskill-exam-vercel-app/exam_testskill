@@ -298,6 +298,8 @@ async function adminUsers(el) {
   });
 
   const pendingList = users.filter((u) => !u.active && u.pendingApproval);
+  const userCount = users.filter((u) => u.role !== 'admin').length;
+  const adminCount = users.filter((u) => u.role === 'admin').length;
 
   el.innerHTML = `
     ${pendingList.length ? `
@@ -312,6 +314,14 @@ async function adminUsers(el) {
       </div>
     ` : ''}
 
+    <!-- แถบเลือกกลุ่มผู้ใช้งานตามบทบาท -->
+    <div class="user-role-filter-bar" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <button type="button" class="btn btn-sm btn-filter-tab btn-primary" data-filter="all">👥 ทั้งหมด (${users.length})</button>
+      <button type="button" class="btn btn-sm btn-filter-tab btn-outline" data-filter="user">👤 ผู้ใช้งาน / User (${userCount})</button>
+      <button type="button" class="btn btn-sm btn-filter-tab btn-outline" data-filter="admin">🛡️ ผู้ดูแลระบบ / แอดมิน (${adminCount})</button>
+      ${pendingList.length ? `<button type="button" class="btn btn-sm btn-filter-tab btn-outline" data-filter="pending" style="color:#d97706;border-color:#f59e0b;">⏳ รออนุมัติ (${pendingList.length})</button>` : ''}
+    </div>
+
     <div class="toolbar">
       <input class="input" id="userSearch" placeholder="ค้นหาชื่อผู้ใช้ / ชื่อ…">
       <span class="spacer"></span>
@@ -324,10 +334,13 @@ async function adminUsers(el) {
       <tbody>${users.map((u) => {
         const expired = u.expires && u.expires < today;
         const isPending = !u.active && u.pendingApproval;
-        return `<tr data-q="${esc((u.username + ' ' + (u.name || '')).toLowerCase())}" style="${isPending ? 'background:rgba(234, 179, 8, 0.06);' : ''}">
+        const role = u.role === 'admin' ? 'admin' : 'user';
+        const allowedPerms = PERM_KEYS.filter(([k]) => u.perms?.[k]);
+
+        return `<tr data-q="${esc((u.username + ' ' + (u.name || '')).toLowerCase())}" data-role="${role}" data-pending="${isPending ? '1' : '0'}" style="${isPending ? 'background:rgba(234, 179, 8, 0.06);' : ''}">
         <td><b>${esc(u.name || '-')}</b><br><small class="muted">@${esc(u.username)}</small>
           ${isPending ? '<br><span class="chip chip-warning chip-xs">⏳ รอคอนเฟิร์มสิทธิ์</span>' : ''}</td>
-        <td>${u.role === 'admin' ? '<span class="chip chip-primary">แอดมิน</span>' : '<span class="chip">ผู้ใช้</span>'}</td>
+        <td>${role === 'admin' ? '<span class="chip chip-primary">ผู้ดูแลระบบ</span>' : '<span class="chip">ผู้ใช้งาน</span>'}</td>
         <td>
           <div class="user-status-cell">
             <label class="switch"><input type="checkbox" data-toggle="${u.id}" ${u.active ? 'checked' : ''} ${u.id === App.user.id ? 'disabled' : ''}><span></span></label>
@@ -340,7 +353,20 @@ async function adminUsers(el) {
             ${u.expires ? `<small class="muted">${new Date(u.expires).toLocaleDateString('th-TH')}</small>` : ''}
           </div>
         </td>
-        <td>${u.role === 'admin' ? '<span class="muted small">ทั้งหมด</span>' : PERM_KEYS.filter(([k]) => u.perms?.[k]).map(([, l]) => `<span class="chip chip-xs">${l}</span>`).join(' ') || '<span class="t-danger small">ไม่มีสิทธิ์</span>'}</td>
+        <td>
+          ${role === 'admin'
+            ? '<span class="chip chip-xs chip-primary">เข้าถึงได้ทั้งหมด</span>'
+            : (allowedPerms.length
+                ? `<details class="user-perm-collapse" style="cursor:pointer;">
+                     <summary class="small" style="color:var(--primary);font-weight:600;user-select:none;list-style:none;display:inline-flex;align-items:center;gap:4px;">
+                       👁️ ดูรายละเอียด (${allowedPerms.length} คลัง) ▾
+                     </summary>
+                     <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;max-width:280px;background:rgba(0,0,0,0.03);padding:6px;border-radius:6px;border:1px solid rgba(0,0,0,0.06);">
+                       ${allowedPerms.map(([, l]) => `<span class="chip chip-xs">${esc(l)}</span>`).join('')}
+                     </div>
+                   </details>`
+                : '<span class="t-danger small">ไม่มีสิทธิ์</span>')}
+        </td>
         <td><small>${fmtDate(u.lastLogin)}</small></td>
         <td class="nowrap">
           <button class="btn btn-ghost btn-sm" data-edit="${u.id}">แก้ไข</button>
@@ -350,7 +376,34 @@ async function adminUsers(el) {
         </td></tr>`;
       }).join('')}</tbody></table></div></section>`;
 
-  $('#userSearch').oninput = (e) => { const q = e.target.value.toLowerCase(); $$('#userTable tbody tr').forEach((tr) => (tr.style.display = tr.dataset.q.includes(q) ? '' : 'none')); };
+  // ระบบกรองข้อมูล (ตามแท็บบทบาท & ช่องค้นหา)
+  let currentFilter = 'all';
+  function filterRows() {
+    const q = ($('#userSearch')?.value || '').toLowerCase();
+    $$('#userTable tbody tr').forEach((tr) => {
+      const matchSearch = tr.dataset.q.includes(q);
+      let matchRole = true;
+      if (currentFilter === 'user') matchRole = tr.dataset.role === 'user';
+      else if (currentFilter === 'admin') matchRole = tr.dataset.role === 'admin';
+      else if (currentFilter === 'pending') matchRole = tr.dataset.pending === '1';
+      tr.style.display = (matchSearch && matchRole) ? '' : 'none';
+    });
+  }
+
+  $$('.btn-filter-tab').forEach((btn) => {
+    btn.onclick = () => {
+      $$('.btn-filter-tab').forEach((b) => {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-outline');
+      });
+      btn.classList.remove('btn-outline');
+      btn.classList.add('btn-primary');
+      currentFilter = btn.dataset.filter;
+      filterRows();
+    };
+  });
+
+  $('#userSearch').oninput = filterRows;
   $('#addUser').onclick = () => userForm();
   $('#importUsers').onclick = importUsersDialog;
   $('#btnQuickSyncCloud')?.addEventListener('click', () => $('#syncCloudUsers')?.click());
@@ -360,6 +413,9 @@ async function adminUsers(el) {
     btn.disabled = true;
     btn.textContent = '⏳ กำลังซิงค์…';
     try {
+      if (typeof CloudSync === 'undefined') {
+        throw new Error('ระบบ CloudSync กำลังโหลด กรุณารีเฟรชหน้าเว็บอีกครั้ง');
+      }
       const res = await CloudSync.syncUsers();
       if (res.added > 0 || res.updated > 0) {
         toast(`ซิงค์ข้อมูลสำเร็จ! เพิ่มคำขอใหม่ ${res.added} คน, อัปเดต ${res.updated} คน`, 'success');

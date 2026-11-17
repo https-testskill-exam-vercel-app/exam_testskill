@@ -179,11 +179,6 @@ const CloudSync = {
     return null;
   },
 
-    // หาก Cloud ไม่พบหรือออฟไลน์ ให้ใช้ข้อมูลที่มีในเครื่อง
-    if (idx >= 0) return localUsers[idx];
-    return null;
-  },
-
   /**
    * สั่งคอนเฟิร์มผู้ใช้งานใน Cloud และสั่งให้ LINE Bot ส่งข้อความตอบกลับเข้าแชทผู้ใช้ทันที
    */
