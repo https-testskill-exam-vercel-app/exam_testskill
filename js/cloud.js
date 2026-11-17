@@ -270,44 +270,27 @@ const CloudSync = {
    * ซิงค์ผู้ใช้จาก Cloud เข้ามาผสานกับ IndexedDB ในเครื่อง
    */
   async syncUsers() {
+    // ล้าง deleted_users เก่าทิ้ง เพื่อไม่ให้มีบัญชีไหนถูกบล็อกถาวร
+    try { await DB.del('deleted_users'); } catch (e) {}
+
     const cloudUsers = await this.fetchUsersFromCloud();
-    const rawDeleted = (await Repo.getDeletedUsernames()) || [];
-    const deletedUsernames = rawDeleted.map((x) => String(x).replace(/^@+/, '').trim().toLowerCase());
-    let localUsers = await Repo.getUsers();
-
-    // 1. กรองผู้ใช้ที่ถูกแอดมินลบออกจาก localUsers ทันที ป้องกันรายชื่อค้าง
-    const initialLocalCount = localUsers.length;
-    localUsers = localUsers.filter((u) => {
-      const uClean = String(u.username || '').replace(/^@+/, '').trim().toLowerCase();
-      return !deletedUsernames.includes(uClean);
-    });
-    const pruned = initialLocalCount - localUsers.length;
-
-    // 2. ถ้าใน Cloud ยังมีผู้ใช้ที่อยู่ในรายการที่แอดมินลบ ให้สั่งลบออกจาก Cloud ทันที!
-    for (const delName of deletedUsernames) {
-      if (cloudUsers.some((cu) => String(cu.username || '').replace(/^@+/, '').trim().toLowerCase() === delName)) {
-        this.deleteUser(delName).catch(() => {});
-      }
-    }
-
-    if (!cloudUsers.length) {
-      if (pruned > 0) await Repo.saveUsers(localUsers);
-      return { added: 0, updated: 0, deleted: pruned };
-    }
-
+    if (!cloudUsers || !cloudUsers.length) return { added: 0, updated: 0 };
+    const localUsers = await Repo.getUsers();
     let added = 0, updated = 0;
 
     for (const cu of cloudUsers) {
       if (!cu.username) continue;
       const cleanUser = String(cu.username).replace(/^@+/, '').trim().toLowerCase();
-      // ถ้าแอดมินลบผู้ใช้นี้ไปแล้ว ข้ามเด็ดขาด ไม่ดึงกลับมาอีก!
-      if (deletedUsernames.includes(cleanUser)) continue;
 
       const idx = localUsers.findIndex((u) => String(u.username || '').replace(/^@+/, '').trim().toLowerCase() === cleanUser);
       if (idx >= 0) {
         // อัปเดตข้อมูลสถานะถ้ามี
         const local = localUsers[idx];
         let changed = false;
+        if (cu.name && cu.name !== local.name) {
+          local.name = cu.name;
+          changed = true;
+        }
         if (cu.active !== undefined && cu.active !== local.active) {
           local.active = cu.active;
           changed = true;
@@ -334,7 +317,7 @@ const CloudSync = {
         }
         if (changed) updated++;
       } else {
-        // เพิ่มผู้ใช้ใหม่ที่สมัครจากเครื่องอื่น
+        // เพิ่มผู้ใช้ใหม่ที่สมัครจากเครื่องอื่นหรือทัก LINE เข้ามา
         localUsers.push({
           id: cu.id || uid('u_'),
           username: String(cu.username).replace(/^@+/, '').trim(),
@@ -353,10 +336,10 @@ const CloudSync = {
       }
     }
 
-    if (added > 0 || updated > 0 || pruned > 0) {
+    if (added > 0 || updated > 0) {
       await Repo.saveUsers(localUsers);
     }
-    return { added, updated, deleted: pruned, total: localUsers.length };
+    return { added, updated, total: localUsers.length };
   },
 
   /**

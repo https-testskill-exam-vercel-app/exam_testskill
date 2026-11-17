@@ -449,7 +449,9 @@ async function adminUsers(el) {
     <div class="toolbar">
       <input class="input" id="userSearch" placeholder="ค้นหาชื่อผู้ใช้ / ชื่อ…">
       <span class="spacer"></span>
-      <button class="btn btn-outline" id="syncCloudUsers" title="ดึงคำขอสมัครและยืนยันสิทธิ์จาก Google Sheet">☁️ ซิงค์จาก Cloud</button>
+      <button class="btn btn-outline" id="syncCloudUsers" title="ดึงคำขอสมัครและยืนยันสิทธิ์จาก Google Sheet (อัปเดตอัตโนมัติทุก 10 วินาที)">
+        ☁️ ซิงค์จาก Cloud <span style="display:inline-block;width:7px;height:7px;background:#10b981;border-radius:50%;margin-left:4px;" title="ระบบตรวจจับคำขอใหม่อัตโนมัติ"></span>
+      </button>
       <button class="btn btn-ghost" id="importUsers">นำเข้าผู้ใช้ (CSV)</button>
       <button class="btn btn-primary" id="addUser">+ เพิ่มผู้ใช้</button>
     </div>
@@ -535,7 +537,7 @@ async function adminUsers(el) {
   $('#syncCloudUsers').onclick = async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
-    btn.textContent = '⏳ กำลังซิงค์…';
+    btn.innerHTML = '⏳ กำลังซิงค์…';
     try {
       if (typeof CloudSync === 'undefined') {
         throw new Error('ระบบ CloudSync กำลังโหลด กรุณารีเฟรชหน้าเว็บอีกครั้ง');
@@ -551,9 +553,47 @@ async function adminUsers(el) {
       toast('ซิงค์ล้มเหลว: ' + err.message, 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = '☁️ ซิงค์จาก Cloud';
+      btn.innerHTML = '☁️ ซิงค์จาก Cloud <span style="display:inline-block;width:7px;height:7px;background:#10b981;border-radius:50%;margin-left:4px;"></span>';
     }
   };
+
+  // Auto-sync ทันทีเมื่อเข้าหน้านี้ หากมีผู้ใช้ใหม่จะอัปเดตตารางให้ทันที
+  if (!window._adminAutoSyncInit) {
+    window._adminAutoSyncInit = true;
+    setTimeout(async () => {
+      try {
+        if (typeof CloudSync !== 'undefined') {
+          const res = await CloudSync.syncUsers();
+          if (res.added > 0 || res.updated > 0) {
+            await adminUsers(el);
+          }
+        }
+      } catch (e) {}
+    }, 400);
+  }
+
+  // ระบบ Auto-Polling ดึงข้อมูลจาก Cloud ทุก 10 วินาทีอัตโนมัติ (ไม่ต้องคอยกดปุ่มซิงค์)
+  if (window._adminSyncTimer) clearInterval(window._adminSyncTimer);
+  window._adminSyncTimer = setInterval(async () => {
+    if (!document.getElementById('syncCloudUsers')) {
+      clearInterval(window._adminSyncTimer);
+      window._adminSyncTimer = null;
+      window._adminAutoSyncInit = false;
+      return;
+    }
+    try {
+      if (typeof CloudSync !== 'undefined' && !window._isSyncingBackground) {
+        window._isSyncingBackground = true;
+        const res = await CloudSync.syncUsers();
+        if (res.added > 0 || res.updated > 0) {
+          toast(`🔔 มีคำขอใหม่ส่งเข้ามาจาก Cloud (${res.added} รายการ) อัปเดตตารางแล้ว!`, 'success', 3500);
+          await adminUsers(el);
+        }
+      }
+    } catch (e) {} finally {
+      window._isSyncingBackground = false;
+    }
+  }, 10000);
 
   $$('[data-edit]').forEach((b) => (b.onclick = () => userForm(users.find((u) => u.id === b.dataset.edit))));
   $$('[data-toggle]').forEach((c) => (c.onchange = async () => { await Repo.updateUser(c.dataset.toggle, { active: c.checked, pendingApproval: false }); toast(c.checked ? 'เปิดใช้งานบัญชีแล้ว' : 'ระงับบัญชีแล้ว', 'success'); }));
@@ -578,7 +618,6 @@ async function adminUsers(el) {
     const u = users.find((x) => x.id === b.dataset.del);
     if (!u) return;
     if (!(await confirmBox('ลบผู้ใช้?', `ลบบัญชี <b>${esc(u.username)}</b> และประวัติการสอบทั้งหมดออกจากระบบและ Cloud (Google Sheet)`, 'ลบ', true))) return;
-    await Repo.markUserDeleted(u.username);
     await Repo.saveUsers(users.filter((x) => x.id !== u.id));
     for (const k of [...(await DB.keys(`progress:${u.id}:`)), 'history:' + u.id, 'seen:' + u.id, 'wrong:' + u.id, 'bookmark:' + u.id]) await DB.del(k);
     if (typeof CloudSync !== 'undefined' && CloudSync.deleteUser) {
