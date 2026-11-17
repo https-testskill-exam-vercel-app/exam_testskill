@@ -130,6 +130,22 @@ function doGet(e) {
       });
     }
 
+    // อัปเดตข้อมูลหรือสถานะผู้ใช้ผ่าน GET (Fallback สำหรับเบราว์เซอร์)
+    if (action === 'update_user' || action === 'update_status') {
+      const payload = {
+        action: 'update_user',
+        username: (e.parameter.username || '').trim(),
+        name: e.parameter.name,
+        role: e.parameter.role,
+        active: e.parameter.active !== undefined ? (e.parameter.active === 'true' || e.parameter.active === true) : undefined,
+        pendingApproval: e.parameter.pendingApproval !== undefined ? (e.parameter.pendingApproval === 'true' || e.parameter.pendingApproval === true) : undefined,
+        package: e.parameter.package,
+        expires: e.parameter.expires,
+        passHash: e.parameter.passHash
+      };
+      return handleWebApiAction(payload);
+    }
+
     // ดึงข้อมูลผู้ใช้เฉพาะราย (ใช้ตอน Login ข้ามเครื่อง ตรวจสอบสิทธิ์และรหัสผ่านล่าสุด)
     if (action === 'get_user') {
       const reqUser = (e && e.parameter && e.parameter.username ? String(e.parameter.username).replace(/^@+/, '').trim().toLowerCase() : '');
@@ -346,7 +362,33 @@ ${WEB_APP_URL}
     });
   }
 
-  // 4. สั่งลบผู้ใช้ออกจาก Google Sheet
+  // 4. อัปเดตข้อมูลหรือสถานะผู้ใช้ทั่วไป (เปิด/ระงับ/แก้ไขสิทธิ์/แพ็กเกจ)
+  if (action === 'update_user' || action === 'update_status') {
+    const rawUsername = (payload.username || '').trim();
+    const cleanUser = rawUsername.replace(/^@+/, '').trim();
+    const cleanUserLower = cleanUser.toLowerCase();
+    if (!cleanUser) return jsonResponse({ status: 'error', message: 'Missing username' });
+    for (let i = 1; i < data.length; i++) {
+      const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+      if (sheetUser === cleanUserLower) {
+        const foundRow = i + 1;
+        if (payload.name !== undefined && payload.name !== '') sheet.getRange(foundRow, 3).setValue(payload.name);
+        if (payload.role !== undefined && payload.role !== '') sheet.getRange(foundRow, 4).setValue(payload.role);
+        if (payload.active !== undefined) {
+          const status = payload.active ? 'active' : (payload.pendingApproval ? 'pending' : 'inactive');
+          sheet.getRange(foundRow, 5).setValue(status);
+        }
+        if (payload.package !== undefined) sheet.getRange(foundRow, 6).setValue(payload.package);
+        if (payload.expires !== undefined) sheet.getRange(foundRow, 7).setValue(payload.expires);
+        if (payload.passHash) sheet.getRange(foundRow, 12).setValue(payload.passHash);
+        sheet.getRange(foundRow, 11).setValue(new Date());
+        return jsonResponse({ status: 'ok', updated: true, username: cleanUser });
+      }
+    }
+    return jsonResponse({ status: 'ok', found: false });
+  }
+
+  // 5. สั่งลบผู้ใช้ออกจาก Google Sheet
   if (action === 'delete_user') {
     const rawUsername = (payload.username || '').trim();
     const cleanUser = rawUsername.replace(/^@+/, '').trim().toLowerCase();

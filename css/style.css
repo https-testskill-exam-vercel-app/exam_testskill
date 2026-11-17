@@ -1927,6 +1927,46 @@ button {
 }
 
 /* ================= Admin Styles ================= */
+.cloud-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--primary);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+.cloud-sync-badge.synced {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+.cloud-sync-badge.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  cursor: pointer;
+}
+.cloud-sync-badge .pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  animation: pulseCloud 1.5s infinite;
+}
+.cloud-sync-badge.synced .pulse-dot {
+  background: #10b981;
+  animation: none;
+}
+@keyframes pulseCloud {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
 .tabs {
   display: flex;
   gap: 0.5rem;

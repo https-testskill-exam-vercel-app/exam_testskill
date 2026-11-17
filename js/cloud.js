@@ -296,36 +296,94 @@ const CloudSync = {
   },
 
   /**
-   * ซิงค์ผู้ใช้จาก Cloud เข้ามาผสานกับ IndexedDB ในเครื่อง
+   * อัปเดตข้อมูลหรือสถานะผู้ใช้ไปยัง Cloud (Google Sheet) รองรับทั้งคอมและมือถือ
+   */
+  async updateUser(username, updateData = {}) {
+    const url = this.getGasUrl();
+    if (!url || !username) return false;
+    const cleanUser = String(username).replace(/^@+/, '').trim();
+    try {
+      // 1. ส่ง POST
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'update_user',
+          username: cleanUser,
+          ...updateData
+        })
+      });
+      // 2. ส่ง GET fallback สำหรับเบราว์เซอร์มือถือ
+      try {
+        const params = new URLSearchParams({
+          action: 'update_user',
+          username: cleanUser,
+          t: String(Date.now())
+        });
+        if (updateData.name !== undefined) params.append('name', updateData.name);
+        if (updateData.role !== undefined) params.append('role', updateData.role);
+        if (updateData.active !== undefined) params.append('active', String(updateData.active));
+        if (updateData.pendingApproval !== undefined) params.append('pendingApproval', String(updateData.pendingApproval));
+        if (updateData.package !== undefined) params.append('package', updateData.package);
+        if (updateData.expires !== undefined) params.append('expires', updateData.expires);
+        if (updateData.passHash !== undefined) params.append('passHash', updateData.passHash);
+        await fetch(`${url}?${params.toString()}`);
+      } catch (e2) {}
+      return true;
+    } catch (e) {
+      console.warn('CloudSync.updateUser warning:', e);
+      return false;
+    }
+  },
+
+  /**
+   * สั่งเปิด/ปิดการใช้งานบัญชีไปยัง Cloud
+   */
+  async updateUserStatus(username, active) {
+    return this.updateUser(username, { active: !!active, pendingApproval: false });
+  },
+
+  /**
+   * ซิงค์ผู้ใช้จาก Cloud เข้ามาผสานกับ IndexedDB ในเครื่อง (แก้ปัญหาข้อมูลไม่อัปเดตข้ามอุปกรณ์)
    */
   async syncUsers() {
     // ล้าง deleted_users เก่าทิ้ง เพื่อไม่ให้มีบัญชีไหนถูกบล็อกถาวร
     try { await DB.del('deleted_users'); } catch (e) {}
 
     const cloudUsers = await this.fetchUsersFromCloud();
-    if (!cloudUsers || !cloudUsers.length) return { added: 0, updated: 0 };
+    if (!cloudUsers || !cloudUsers.length) return { added: 0, updated: 0, deleted: 0 };
     const localUsers = await Repo.getUsers();
-    let added = 0, updated = 0;
+    let added = 0, updated = 0, deleted = 0;
 
+    const cloudUserMap = new Map();
     for (const cu of cloudUsers) {
       if (!cu.username) continue;
       const cleanUser = String(cu.username).replace(/^@+/, '').trim().toLowerCase();
+      cloudUserMap.set(cleanUser, cu);
+    }
 
-      const idx = localUsers.findIndex((u) => String(u.username || '').replace(/^@+/, '').trim().toLowerCase() === cleanUser);
-      if (idx >= 0) {
-        // อัปเดตข้อมูลสถานะถ้ามี
-        const local = localUsers[idx];
+    // 1. อัปเดตข้อมูลผู้ใช้ที่มีอยู่เดิมในเครื่อง
+    for (let i = 0; i < localUsers.length; i++) {
+      const local = localUsers[i];
+      const cleanUser = String(local.username || '').replace(/^@+/, '').trim().toLowerCase();
+      const cu = cloudUserMap.get(cleanUser);
+      if (cu) {
         let changed = false;
         if (cu.name && cu.name !== local.name) {
           local.name = cu.name;
           changed = true;
         }
+        if (cu.role && cu.role !== local.role && local.username !== 'admin') {
+          local.role = cu.role;
+          changed = true;
+        }
         if (cu.active !== undefined && cu.active !== local.active) {
-          local.active = cu.active;
+          local.active = !!cu.active;
           changed = true;
         }
         if (cu.pendingApproval !== undefined && cu.pendingApproval !== local.pendingApproval) {
-          local.pendingApproval = cu.pendingApproval;
+          local.pendingApproval = !!cu.pendingApproval;
           changed = true;
         }
         if (cu.package && cu.package !== local.package) {
@@ -340,7 +398,8 @@ const CloudSync = {
           local.lineUserId = cu.lineUserId;
           changed = true;
         }
-        if (cu.passHash && !local.passHash) {
+        // แก้ไข: หากใน Cloud มี passHash ใหม่ ให้อัปเดตเข้า local ทันที (ข้ามเครื่องได้เสถียร)
+        if (cu.passHash && cu.passHash !== local.passHash) {
           local.passHash = cu.passHash;
           changed = true;
         }
@@ -350,8 +409,13 @@ const CloudSync = {
           changed = true;
         }
         if (changed) updated++;
-      } else {
-        // เพิ่มผู้ใช้ใหม่ที่สมัครจากเครื่องอื่นหรือทัก LINE เข้ามา
+      }
+    }
+
+    // 2. เพิ่มผู้ใช้ใหม่ที่มาจาก Cloud แต่ในเครื่องยังไม่มี (เช่น สมัครจากคอมหรือ LINE แต่เปิดดูในมือถือ)
+    for (const [cleanUser, cu] of cloudUserMap.entries()) {
+      const exists = localUsers.some((u) => String(u.username || '').replace(/^@+/, '').trim().toLowerCase() === cleanUser);
+      if (!exists) {
         const isApproved = !!cu.active && !cu.pendingApproval;
         localUsers.push({
           id: cu.id || uid('u_'),
@@ -371,10 +435,27 @@ const CloudSync = {
       }
     }
 
-    if (added > 0 || updated > 0) {
+    // 3. ตรวจสอบบัญชีที่ถูกลบบน Cloud: ป้องกัน Ghost Users ค้างใน IndexedDB มือถือ
+    if (cloudUsers.length > 0) {
+      const remainingUsers = localUsers.filter((u) => {
+        const uname = String(u.username || '').replace(/^@+/, '').trim().toLowerCase();
+        if (u.role === 'admin' || uname === 'admin') return true;
+        if (!cloudUserMap.has(uname)) {
+          deleted++;
+          return false;
+        }
+        return true;
+      });
+      if (deleted > 0) {
+        localUsers.length = 0;
+        localUsers.push(...remainingUsers);
+      }
+    }
+
+    if (added > 0 || updated > 0 || deleted > 0) {
       await Repo.saveUsers(localUsers);
     }
-    return { added, updated, total: localUsers.length };
+    return { added, updated, deleted, total: localUsers.length };
   },
 
   /**

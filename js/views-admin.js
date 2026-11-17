@@ -94,6 +94,19 @@ function doGet(e) {
         passHash: (e.parameter.passHash || '').trim()
       });
     }
+    if (action === 'update_user' || action === 'update_status') {
+      return handleWebApiAction({
+        action: 'update_user',
+        username: (e.parameter.username || '').trim(),
+        name: e.parameter.name,
+        role: e.parameter.role,
+        active: e.parameter.active !== undefined ? (e.parameter.active === 'true' || e.parameter.active === true) : undefined,
+        pendingApproval: e.parameter.pendingApproval !== undefined ? (e.parameter.pendingApproval === 'true' || e.parameter.pendingApproval === true) : undefined,
+        package: e.parameter.package,
+        expires: e.parameter.expires,
+        passHash: e.parameter.passHash
+      });
+    }
     if (action === 'get_user') {
       const reqUser = (e && e.parameter && e.parameter.username ? String(e.parameter.username).replace(/^@+/, '').trim().toLowerCase() : '');
       if (!reqUser) return jsonResponse({ status: 'error', message: 'username required' });
@@ -222,6 +235,29 @@ function handleWebApiAction(payload) {
       lineSent = pushLineMessage(lineUserId, pushText);
     }
     return jsonResponse({ status: 'ok', username: cleanUser, lineSent: lineSent, hasLineId: !!lineUserId });
+  }
+
+  if (action === 'update_user' || action === 'update_status') {
+    const cleanUser = String(payload.username || '').replace(/^@+/, '').trim();
+    const cleanUserLower = cleanUser.toLowerCase();
+    if (!cleanUser) return jsonResponse({ status: 'error', message: 'Missing username' });
+    for (let i = 1; i < data.length; i++) {
+      const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+      if (sheetUser === cleanUserLower) {
+        if (payload.name !== undefined && payload.name !== '') sheet.getRange(i + 1, 3).setValue(payload.name);
+        if (payload.role !== undefined && payload.role !== '') sheet.getRange(i + 1, 4).setValue(payload.role);
+        if (payload.active !== undefined) {
+          const status = payload.active ? 'active' : (payload.pendingApproval ? 'pending' : 'inactive');
+          sheet.getRange(i + 1, 5).setValue(status);
+        }
+        if (payload.package !== undefined) sheet.getRange(i + 1, 6).setValue(payload.package);
+        if (payload.expires !== undefined) sheet.getRange(i + 1, 7).setValue(payload.expires);
+        if (payload.passHash) sheet.getRange(i + 1, 12).setValue(payload.passHash);
+        sheet.getRange(i + 1, 11).setValue(new Date());
+        return jsonResponse({ status: 'ok', updated: true });
+      }
+    }
+    return jsonResponse({ status: 'ok', found: false });
   }
 
   if (action === 'delete_user') {
