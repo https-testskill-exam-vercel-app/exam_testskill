@@ -22,9 +22,41 @@ const Theme = {
 
 const Auth = {
   async login(username, password) {
-    const users = await Repo.getUsers();
-    const u = users.find((x) => x.username.toLowerCase() === String(username).trim().toLowerCase());
-    if (!u || u.passHash !== (await hashPassword(u.username, password))) throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+    const cleanUser = String(username).trim();
+    if (!cleanUser) throw new Error('กรุณาระบุชื่อผู้ใช้');
+    const inputHash = await hashPassword(cleanUser, password);
+
+    // 1. ซิงค์ข้อมูลล่าสุดจาก Cloud ก่อนเสมอ เพื่อให้สิทธิ์ที่แอดมินเพิ่งอนุมัติอัปเดตทันทีข้ามเครื่อง
+    let u = null;
+    try {
+      if (typeof CloudSync !== 'undefined' && CloudSync.syncUserOnLogin) {
+        u = await CloudSync.syncUserOnLogin(cleanUser, inputHash);
+      }
+    } catch (e) {
+      console.warn('Sync user on login warning:', e);
+    }
+
+    if (!u) {
+      const users = await Repo.getUsers();
+      u = users.find((x) => x.username.toLowerCase() === cleanUser.toLowerCase());
+    }
+
+    if (!u) throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+
+    // ตรวจสอบรหัสผ่าน
+    if (u.passHash && u.passHash !== inputHash) {
+      throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+    }
+
+    // กรณีผู้ใช้เดิมที่ไม่มี passHash ใน cloud หรือเครื่องใหม่ ให้บันทึก inputHash ทันที
+    if (!u.passHash) {
+      u.passHash = inputHash;
+      await Repo.updateUser(u.id, { passHash: inputHash });
+      if (typeof CloudSync !== 'undefined' && CloudSync.updatePassHash) {
+        CloudSync.updatePassHash(u.username, inputHash).catch(() => {});
+      }
+    }
+
     Auth.checkAllowed(u);
     await Repo.updateUser(u.id, { lastLogin: Date.now() });
     localStorage.setItem('kf-session', JSON.stringify({ uid: u.id, at: Date.now() }));
@@ -45,8 +77,26 @@ const Auth = {
     try {
       const s = JSON.parse(localStorage.getItem('kf-session') || 'null');
       if (!s) return null;
-      const u = await Repo.getUser(s.uid);
+      let u = await Repo.getUser(s.uid);
       if (!u) return null;
+      // ซิงค์สถานะล่าสุดจาก cloud เพื่อให้การต่ออายุ/ระงับสิทธิ์มีผล
+      try {
+        if (typeof CloudSync !== 'undefined' && CloudSync.fetchUser) {
+          const cu = await CloudSync.fetchUser(u.username);
+          if (cu && cu.active !== undefined) {
+            u.active = cu.active;
+            u.pendingApproval = cu.pendingApproval;
+            u.package = cu.package || u.package;
+            u.expires = cu.expires || u.expires;
+            await Repo.updateUser(u.id, {
+              active: u.active,
+              pendingApproval: u.pendingApproval,
+              package: u.package,
+              expires: u.expires
+            });
+          }
+        }
+      } catch {}
       Auth.checkAllowed(u);
       return u;
     } catch { localStorage.removeItem('kf-session'); return null; }

@@ -37,6 +37,7 @@ const CloudSync = {
             id: user.id,
             username: user.username,
             name: user.name || user.username,
+            passHash: user.passHash || '',
             role: user.role || 'user',
             active: !!user.active,
             pendingApproval: user.pendingApproval !== false,
@@ -50,6 +51,113 @@ const CloudSync = {
       console.warn('CloudSync.registerRequest warning:', e);
       return false;
     }
+  },
+
+  /**
+   * อัปเดต passHash ข้ามเครื่องขึ้น Cloud
+   */
+  async updatePassHash(username, passHash) {
+    const url = this.getGasUrl();
+    if (!url || !username || !passHash) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'update_pass_hash',
+          username,
+          passHash
+        })
+      });
+      return true;
+    } catch (e) {
+      console.warn('CloudSync.updatePassHash warning:', e);
+      return false;
+    }
+  },
+
+  /**
+   * ดึงข้อมูลผู้ใช้เฉพาะรายจาก Google Sheet
+   */
+  async fetchUser(username) {
+    const url = this.getGasUrl();
+    if (!url || !username) return null;
+    try {
+      const res = await fetch(`${url}?action=get_user&username=${encodeURIComponent(username.trim())}&t=${Date.now()}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && data.status === 'ok' && data.found && data.user) {
+        return data.user;
+      }
+      return null;
+    } catch (e) {
+      console.warn('CloudSync.fetchUser warning:', e);
+      return null;
+    }
+  },
+
+  /**
+   * ซิงค์ผู้ใช้ตอน Login เพื่อให้ได้สถานะคอนเฟิร์มและรหัสผ่านล่าสุดเสมอ (แก้ปัญหาข้ามเครื่อง)
+   */
+  async syncUserOnLogin(username, inputHash) {
+    const cleanUser = String(username).trim();
+    if (!cleanUser) return null;
+
+    // ดึงผู้ใช้ล่าสุดจาก Cloud
+    const cu = await this.fetchUser(cleanUser);
+    const localUsers = await Repo.getUsers();
+    const idx = localUsers.findIndex((u) => u.username.toLowerCase() === cleanUser.toLowerCase());
+
+    if (cu) {
+      if (idx >= 0) {
+        // อัปเดตสถานะที่แอดมินเพิ่งอนุมัติจากเครื่องอื่น
+        const local = localUsers[idx];
+        local.active = cu.active;
+        local.pendingApproval = cu.pendingApproval;
+        local.role = cu.role || local.role;
+        local.package = cu.package || local.package;
+        local.expires = cu.expires || local.expires;
+        local.lineUserId = cu.lineUserId || local.lineUserId;
+        if (cu.passHash) {
+          local.passHash = cu.passHash;
+        } else if (local.passHash) {
+          // ท้องถิ่นมี hash แต่ cloud ยังไม่มี -> ซิงค์ขึ้น cloud
+          this.updatePassHash(cleanUser, local.passHash).catch(() => {});
+        } else if (inputHash) {
+          local.passHash = inputHash;
+          this.updatePassHash(cleanUser, inputHash).catch(() => {});
+        }
+        await Repo.saveUsers(localUsers);
+        return local;
+      } else {
+        // ผู้ใช้ล็อกอินจากเครื่องใหม่ที่ยังไม่มีข้อมูลใน IndexedDB
+        const newUser = {
+          id: cu.id || uid('u_'),
+          username: cu.username,
+          name: cu.name || cu.username,
+          passHash: cu.passHash || inputHash || '',
+          role: cu.role || 'user',
+          active: !!cu.active,
+          pendingApproval: cu.pendingApproval !== false,
+          package: cu.package || '',
+          expires: cu.expires || '',
+          lineUserId: cu.lineUserId || '',
+          perms: {},
+          createdAt: cu.createdAt || Date.now()
+        };
+        localUsers.push(newUser);
+        await Repo.saveUsers(localUsers);
+        if (!cu.passHash && inputHash) {
+          this.updatePassHash(cleanUser, inputHash).catch(() => {});
+        }
+        return newUser;
+      }
+    }
+
+    // หาก Cloud ไม่พบหรือออฟไลน์ ให้ใช้ข้อมูลที่มีในเครื่อง
+    if (idx >= 0) return localUsers[idx];
+    return null;
   },
 
   /**
@@ -112,23 +220,45 @@ const CloudSync = {
       if (idx >= 0) {
         // อัปเดตข้อมูลสถานะถ้ามี
         const local = localUsers[idx];
+        let changed = false;
         if (cu.active !== undefined && cu.active !== local.active) {
           local.active = cu.active;
-          local.pendingApproval = cu.pendingApproval;
-          local.expires = cu.expires || local.expires;
-          updated++;
+          changed = true;
         }
+        if (cu.pendingApproval !== undefined && cu.pendingApproval !== local.pendingApproval) {
+          local.pendingApproval = cu.pendingApproval;
+          changed = true;
+        }
+        if (cu.package && cu.package !== local.package) {
+          local.package = cu.package;
+          changed = true;
+        }
+        if (cu.expires && cu.expires !== local.expires) {
+          local.expires = cu.expires;
+          changed = true;
+        }
+        if (cu.lineUserId && cu.lineUserId !== local.lineUserId) {
+          local.lineUserId = cu.lineUserId;
+          changed = true;
+        }
+        if (cu.passHash && !local.passHash) {
+          local.passHash = cu.passHash;
+          changed = true;
+        }
+        if (changed) updated++;
       } else {
         // เพิ่มผู้ใช้ใหม่ที่สมัครจากเครื่องอื่น
         localUsers.push({
           id: cu.id || uid('u_'),
           username: cu.username,
           name: cu.name || cu.username,
-          passHash: '', // ผู้ใช้ล็อกอินผ่านระบบเดิม
+          passHash: cu.passHash || '',
           role: cu.role || 'user',
           active: !!cu.active,
           pendingApproval: cu.pendingApproval !== false,
+          package: cu.package || '',
           expires: cu.expires || '',
+          lineUserId: cu.lineUserId || '',
           perms: {},
           createdAt: cu.createdAt || Date.now()
         });

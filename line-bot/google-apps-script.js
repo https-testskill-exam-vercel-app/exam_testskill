@@ -30,10 +30,12 @@ function getDatabaseSheet(sheetName = 'Users') {
     sheet = ss.insertSheet(sheetName);
     if (sheetName === 'Users') {
       sheet.appendRow([
-        'ID', 'Username', 'Name', 'Role', 'Status', 'Package', 'Expires', 'LINE_User_ID', 'LINE_Name', 'Created_At', 'Updated_At'
+        'ID', 'Username', 'Name', 'Role', 'Status', 'Package', 'Expires', 'LINE_User_ID', 'LINE_Name', 'Created_At', 'Updated_At', 'Pass_Hash'
       ]);
       sheet.setFrozenRows(1);
     }
+  } else if (sheetName === 'Users' && sheet.getLastColumn() < 12) {
+    sheet.getRange(1, 12).setValue('Pass_Hash');
   }
   return sheet;
 }
@@ -81,6 +83,38 @@ function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || 'ping';
 
+    // ดึงข้อมูลผู้ใช้เฉพาะราย (ใช้ตอน Login ข้ามเครื่อง ตรวจสอบสิทธิ์และรหัสผ่านล่าสุด)
+    if (action === 'get_user') {
+      const reqUser = (e && e.parameter && e.parameter.username ? String(e.parameter.username).trim() : '');
+      if (!reqUser) return jsonResponse({ status: 'error', message: 'username required' });
+      const sheet = getDatabaseSheet('Users');
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][1]).toLowerCase() === reqUser.toLowerCase()) {
+          return jsonResponse({
+            status: 'ok',
+            found: true,
+            user: {
+              id: String(data[i][0] || ''),
+              username: String(data[i][1] || ''),
+              name: String(data[i][2] || ''),
+              role: String(data[i][3] || 'user'),
+              active: data[i][4] === 'active',
+              pendingApproval: data[i][4] === 'pending',
+              package: String(data[i][5] || ''),
+              expires: String(data[i][6] || ''),
+              lineUserId: String(data[i][7] || ''),
+              lineName: String(data[i][8] || ''),
+              createdAt: data[i][9] || '',
+              updatedAt: data[i][10] || '',
+              passHash: String(data[i][11] || '')
+            }
+          });
+        }
+      }
+      return jsonResponse({ status: 'ok', found: false });
+    }
+
     // ดึงรายชื่อผู้ใช้ทั้งหมดจาก Google Sheet ส่งกลับหน้าเว็บ
     if (action === 'get_users' || action === 'list') {
       const sheet = getDatabaseSheet('Users');
@@ -100,7 +134,8 @@ function doGet(e) {
         lineUserId: String(r[7] || ''),
         lineName: String(r[8] || ''),
         createdAt: r[9] || '',
-        updatedAt: r[10] || ''
+        updatedAt: r[10] || '',
+        passHash: String(r[11] || '')
       })).filter((u) => u.username);
 
       return jsonResponse(users);
@@ -149,6 +184,7 @@ function handleWebApiAction(payload) {
       sheet.getRange(foundRow, 3).setValue(u.name || username);
       sheet.getRange(foundRow, 5).setValue('pending');
       sheet.getRange(foundRow, 11).setValue(now);
+      if (u.passHash) sheet.getRange(foundRow, 12).setValue(u.passHash);
     } else {
       sheet.appendRow([
         u.id || ('u_' + Date.now()),
@@ -161,13 +197,29 @@ function handleWebApiAction(payload) {
         '', // LINE User ID (จะผูกเมื่อผู้ใช้ทัก LINE)
         '', // LINE Name
         now,
-        now
+        now,
+        u.passHash || '' // Pass_Hash Col 12
       ]);
     }
     return jsonResponse({ status: 'ok', message: 'User registered to cloud' });
   }
 
-  // 2. แอดมินกด "คอนเฟิร์ม" สิทธิ์และเลือกแพ็กเกจ
+  // 2. อัปเดตรหัสผ่าน (PassHash) ข้ามเครื่อง
+  if (action === 'update_pass_hash') {
+    const username = (payload.username || '').trim();
+    const passHash = (payload.passHash || '').trim();
+    if (!username || !passHash) return jsonResponse({ status: 'error', message: 'Missing fields' });
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase() === username.toLowerCase()) {
+        sheet.getRange(i + 1, 12).setValue(passHash);
+        sheet.getRange(i + 1, 11).setValue(new Date());
+        return jsonResponse({ status: 'ok', message: 'PassHash updated' });
+      }
+    }
+    return jsonResponse({ status: 'error', message: 'User not found' });
+  }
+
+  // 3. แอดมินกด "คอนเฟิร์ม" สิทธิ์และเลือกแพ็กเกจ
   if (action === 'confirm_user') {
     const username = (payload.username || '').trim();
     const pkgTitle = payload.packageTitle || 'แพ็กเกจมาตรฐาน';
@@ -469,4 +521,12 @@ function pushLineMessage(toUserId, text) {
     console.error('Push LINE message error:', err);
     return false;
   }
+}
+
+// ฟังก์ชันสำหรับกด "เรียกใช้" ใน Google Apps Script Editor เพื่อขอสิทธิ์ Authorization ครั้งแรก
+function testSystem() {
+  const sheet = getDatabaseSheet('Users');
+  const count = sheet.getLastRow();
+  Logger.log('✅ เชื่อมต่อ Google Sheets สำเร็จ! จำนวนแถวทั้งหมด: ' + count);
+  return 'OK - พร้อมใช้งาน สิทธิ์ Google Sheets ครบถ้วน';
 }
