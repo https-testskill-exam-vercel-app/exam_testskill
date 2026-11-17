@@ -8,7 +8,7 @@
  */
 
 // 1. การตั้งค่าระบบ
-const CHANNEL_ACCESS_TOKEN = 'd1xBeCIUSf5NKf8r2ZxsQKXLmq/XWz6v6xbNezf1K1Le8hMI+kJgIrZFPGlpgrd+GyEf165uFK1p8R4x3wVHJo+cfUdvjGgNFHBGLxlZI4Mlua1cBfxC5e3dDhvak3x9pQv7bQ9PalCeE9XAC/gDCAdB04t89/1O/w1cDnyilFU=';
+const CHANNEL_ACCESS_TOKEN = 'd1xBeCIUSf5NKf8r2ZxsQKXLmq/XWz6v6xbNezf1K1Le8hMI+kJgIrZFPGlpgrd+GyEf165uFK1p8R4x3wVHJo+cfUdvjGgNFHBGLxlZI4Mlua1cBfxC5e3dDHvaK3x9pQv7bQ9PalCeE9XAC/gDCAdB04t89/1O/w1cDnyilFU=';
 const SPREADSHEET_NAME = 'TestSkill_User_Database';
 const WEB_APP_URL = 'https://https-testskill-exam-vercel-app.github.io/exam_testskill/';
 
@@ -252,7 +252,7 @@ function handleWebApiAction(payload) {
         : 'ใช้งานได้ตลอดชีพ (ไม่มีวันหมดอายุ)';
 
       const pushText =
-`🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้คุณเรียบร้อยแล้วครับ!
+`🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้เรียบร้อยแล้ว
 
 👤 บัญชีผู้ใช้: @${username}
 📦 แพ็กเกจ: ${pkgTitle}
@@ -261,7 +261,7 @@ function handleWebApiAction(payload) {
 🔗 เข้าสู่ระบบและเริ่มทำแบบทดสอบได้ทันที:
 ${WEB_APP_URL}
 
-ขอให้ตั้งใจฝึกฝนและทำคะแนนได้ตามเป้าหมายครับ ✌️✨`;
+ขอให้ตั้งใจฝึกฝนและทำคะแนนได้ตามเป้าหมาย ✌️✨`;
 
       lineSent = pushLineMessage(lineUserId, pushText);
     }
@@ -297,11 +297,11 @@ function handleLineTextMessage(event) {
     const replyText =
 `🔑 [ได้รับคำขอยืนยันสิทธิ์ของ @${rawUsername} แล้ว]
 
-สวัสดีครับ @${rawUsername} 👋
-ระบบได้เชื่อมต่อบัญชี LINE ของท่านกับไอดีในระบบเรียบร้อยแล้วครับ!
+สวัสดี @${rawUsername} 👋
+ระบบได้เชื่อมต่อบัญชี LINE ของท่านกับไอดีในระบบเรียบร้อยแล้ว!
 
 ⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) คอนเฟิร์มแพ็กเกจ
-เมื่อแอดมินกดคอนเฟิร์มในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันทีครับ ไม่ต้องคอยเปิดดูหน้าเว็บครับ 😊`;
+เมื่อแอดมินกดคอนเฟิร์มในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊`;
 
     return sendLineReply(replyToken, [
       { type: 'text', text: replyText, quickReply: getQuickReplyMenu() }
@@ -363,13 +363,13 @@ function replyVerification(replyToken, text) {
   const replyText =
 `🔑 [1. ขอยืนยันสิทธิ์เข้าใช้งานระบบ TestSkill]
 
-สวัสดีครับ 👋 เพื่อให้ระบบส่งแจ้งเตือนกลับหาท่านได้อัตโนมัติ:
-กรุณาพิมพ์แจ้ง "ไอดี" ของท่านในแชทนี้ได้เลยครับ เช่น:
+สวัสดี 👋 เพื่อให้ระบบส่งแจ้งเตือนกลับหาท่านได้อัตโนมัติ:
+กรุณาพิมพ์แจ้ง "ไอดี" ของท่านในแชทนี้ได้เลย เช่น:
 👉 @ไอดีของคุณ (เช่น @KruThai2026)
 
 (หากยังไม่ได้สมัครสมาชิก สามารถกดสมัครได้ที่เว็บ: ${WEB_APP_URL}#/register)
 
-เมื่อแอดมิน (คุณภาณุวัฒน์) กดคอนเฟิร์มในระบบ จะมีข้อความแจ้งเตือนอัตโนมัติส่งกลับมาที่นี่ทันทีครับ!`;
+เมื่อแอดมิน (คุณภาณุวัฒน์) กดคอนเฟิร์มในระบบ จะมีข้อความแจ้งเตือนอัตโนมัติส่งกลับมาที่นี่ทันที!`;
 
   sendLineReply(replyToken, [
     { type: 'text', text: replyText, quickReply: getQuickReplyMenu() }
@@ -385,7 +385,7 @@ function replyDeveloper(replyToken) {
 • Line ID ส่วนตัว: Panuwat_99999
 • ระบบสอบออนไลน์เตรียมความพร้อมใบประกอบวิชาชีพครู By กลางฟู
 
-ท่านสามารถพิมพ์ข้อความ ข้อเสนอแนะ หรือคำถามทิ้งไว้ในแชทนี้ได้เลยครับ แอดมินจะรีบเข้ามาตอบกลับโดยเร็วที่สุดครับ 😊`;
+ท่านสามารถพิมพ์ข้อความ ข้อเสนอแนะ หรือคำถามทิ้งไว้ในแชทนี้ได้เลย แอดมินจะรีบเข้ามาตอบกลับโดยเร็วที่สุด 😊`;
 
   sendLineReply(replyToken, [
     { type: 'text', text: replyText, quickReply: getQuickReplyMenu() }
@@ -396,12 +396,12 @@ function replyReportIssue(replyToken) {
   const replyText =
 `🛠️ [3. แจ้งปัญหาการใช้งาน / พบข้อผิดพลาด]
 
-ขออภัยในความไม่สะดวกครับ เพื่อความรวดเร็วในการแก้ไข กรุณาระบุข้อมูลดังนี้:
+ขออภัยในความไม่สะดวก เพื่อความรวดเร็วในการแก้ไข กรุณาระบุข้อมูลดังนี้:
 1. ชุดข้อสอบและข้อที่พบปัญหา (เช่น ชุดที่ 5 ข้อที่ 12)
 2. อาการของปัญหา (เช่น เฉลยผิด, หน้าจอค้าง, บันทึกคะแนนไม่ได้)
 3. รูปภาพหน้าจอ (Screenshot) หากสะดวกแนบมา
 
-ทีมงานจะตรวจสอบและปรับปรุงแก้ไขระบบให้ทันทีครับ ขอบคุณครับ!`;
+ทีมงานจะตรวจสอบและปรับปรุงแก้ไขระบบให้ทันที ขอบคุณ!`;
 
   sendLineReply(replyToken, [
     { type: 'text', text: replyText, quickReply: getQuickReplyMenu() }
@@ -417,7 +417,7 @@ function replyGeneral(replyToken) {
 • ชุดรวมเทียบเคียงข้อสอบจริง 24 ชุด (2,295 ข้อ)
 • ระบบจับเวลา บันทึกผลสอบ เฉลยละเอียดพร้อมเกร็ดความรู้ทุกข้อ และ AI วิเคราะห์ผลสอบ
 
-ท่านสามารถพิมพ์คำถามหรือข้อสงสัยเพิ่มเติมส่งมาในแชทนี้ได้ตลอดเวลาครับ!`;
+ท่านสามารถพิมพ์คำถามหรือข้อสงสัยเพิ่มเติมส่งมาในแชทนี้ได้ตลอดเวลา!`;
 
   sendLineReply(replyToken, [
     { type: 'text', text: replyText, quickReply: getQuickReplyMenu() }
@@ -426,7 +426,7 @@ function replyGeneral(replyToken) {
 
 function replyMainMenu(replyToken, userText) {
   const msg =
-`สวัสดีครับ 👋 ยินดีต้อนรับสู่ LINE Official ของระบบ TestSkill (By กลางฟู)
+`สวัสดี 👋 ยินดีต้อนรับสู่ LINE Official ของระบบ TestSkill (By กลางฟู)
 
 กรุณาเลือกหัวข้อที่ต้องการรับบริการ:
 1️⃣ ยืนยันสิทธิ์ (ขอเปิดสิทธิ์ / ต่ออายุ)
@@ -434,7 +434,7 @@ function replyMainMenu(replyToken, userText) {
 3️⃣ แจ้งปัญหาการใช้งาน
 4️⃣ สอบถาม อื่นๆ
 
-👉 พิมพ์หมายเลข 1, 2, 3 หรือ 4 หรือพิมพ์ @ไอดีของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันทีครับ`;
+👉 พิมพ์หมายเลข 1, 2, 3 หรือ 4 หรือพิมพ์ @ไอดีของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันที`;
 
   sendLineReply(replyToken, [
     { type: 'text', text: msg, quickReply: getQuickReplyMenu() }
