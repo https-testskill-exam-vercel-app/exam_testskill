@@ -823,7 +823,7 @@ async function renderHome() {
             <span class="line-badge">LINE</span>
             <b>Line ID : <span class="line-id-text">Panuwat_99999</span></b>
             <button type="button" class="btn-copy-line" data-copy-line="Panuwat_99999">คัดลอก ID</button>
-            <button type="button" class="btn-copy-line" data-open-qr>สแกน QR</button>
+            <button type="button" class="btn-copy-line" data-open-qr data-contact-topic="issue" title="แจ้งปัญหาการใช้งานหรือติดต่อสอบถาม">แจ้งปัญหาการใช้งาน/อื่นๆ</button>
           </div>
         </div>
       </div>
