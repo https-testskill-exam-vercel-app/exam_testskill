@@ -21,9 +21,11 @@ function getDatabaseSheet(sheetName = 'Users') {
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
     if (sheetName === 'Users') {
-      sheet.appendRow(['ID', 'Username', 'Name', 'Role', 'Status', 'Package', 'Expires', 'LINE_User_ID', 'LINE_Name', 'Created_At', 'Updated_At']);
+      sheet.appendRow(['ID', 'Username', 'Name', 'Role', 'Status', 'Package', 'Expires', 'LINE_User_ID', 'LINE_Name', 'Created_At', 'Updated_At', 'Pass_Hash']);
       sheet.setFrozenRows(1);
     }
+  } else if (sheetName === 'Users' && sheet.getLastColumn() < 12) {
+    sheet.getRange(1, 12).setValue('Pass_Hash');
   }
   return sheet;
 }
@@ -53,16 +55,49 @@ function doPost(e) {
 function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || 'ping';
+    if (action === 'confirm_user') {
+      return handleWebApiAction({
+        action: 'confirm_user',
+        username: (e.parameter.username || '').trim(),
+        name: (e.parameter.name || '').trim(),
+        packageTitle: (e.parameter.package || e.parameter.packageTitle || 'แพ็กเกจมาตรฐาน').trim(),
+        expires: (e.parameter.expires || '').trim(),
+        adminName: (e.parameter.adminName || 'ภาณุวัฒน์').trim()
+      });
+    }
+    if (action === 'get_user') {
+      const reqUser = (e && e.parameter && e.parameter.username ? String(e.parameter.username).replace(/^@+/, '').trim().toLowerCase() : '');
+      if (!reqUser) return jsonResponse({ status: 'error', message: 'username required' });
+      const sheet = getDatabaseSheet('Users');
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+        if (sheetUser === reqUser) {
+          return jsonResponse({
+            status: 'ok', found: true,
+            user: {
+              id: String(data[i][0] || ''), username: String(data[i][1] || '').replace(/^@+/, '').trim(),
+              name: String(data[i][2] || ''), role: String(data[i][3] || 'user'),
+              active: data[i][4] === 'active', pendingApproval: data[i][4] === 'pending',
+              package: String(data[i][5] || ''), expires: String(data[i][6] || ''),
+              lineUserId: String(data[i][7] || ''), lineName: String(data[i][8] || ''),
+              createdAt: data[i][9] || '', updatedAt: data[i][10] || '', passHash: String(data[i][11] || '')
+            }
+          });
+        }
+      }
+      return jsonResponse({ status: 'ok', found: false });
+    }
     if (action === 'get_users' || action === 'list') {
       const sheet = getDatabaseSheet('Users');
       const data = sheet.getDataRange().getValues();
       if (data.length <= 1) return jsonResponse([]);
       const rows = data.slice(1);
       const users = rows.map((r) => ({
-        id: String(r[0] || ''), username: String(r[1] || ''), name: String(r[2] || ''),
+        id: String(r[0] || ''), username: String(r[1] || '').replace(/^@+/, '').trim(), name: String(r[2] || ''),
         role: String(r[3] || 'user'), active: r[4] === 'active', pendingApproval: r[4] === 'pending',
         package: String(r[5] || ''), expires: String(r[6] || ''), lineUserId: String(r[7] || ''),
-        createdAt: r[9] || '', updatedAt: r[10] || ''
+        createdAt: r[9] || '', updatedAt: r[10] || '', passHash: String(r[11] || '')
       })).filter((u) => u.username);
       return jsonResponse(users);
     }
@@ -80,49 +115,99 @@ function handleWebApiAction(payload) {
   const action = payload.action;
   const sheet = getDatabaseSheet('Users');
   const data = sheet.getDataRange().getValues();
+
   if (action === 'register') {
     const u = payload.user || {};
-    const username = (u.username || '').trim();
-    if (!username) return jsonResponse({ status: 'error', message: 'Username required' });
+    const rawUsername = (u.username || '').trim();
+    const cleanUser = rawUsername.replace(/^@+/, '').trim();
+    if (!cleanUser) return jsonResponse({ status: 'error', message: 'Username required' });
     let foundRow = -1;
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][1]).toLowerCase() === username.toLowerCase()) { foundRow = i + 1; break; }
+      const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+      if (sheetUser === cleanUser.toLowerCase()) { foundRow = i + 1; break; }
     }
     const now = new Date();
     if (foundRow > 0) {
-      sheet.getRange(foundRow, 3).setValue(u.name || username);
+      sheet.getRange(foundRow, 2).setValue(cleanUser);
+      sheet.getRange(foundRow, 3).setValue(u.name || cleanUser);
       sheet.getRange(foundRow, 5).setValue('pending');
       sheet.getRange(foundRow, 11).setValue(now);
+      if (u.passHash) sheet.getRange(foundRow, 12).setValue(u.passHash);
     } else {
-      sheet.appendRow([u.id || ('u_' + Date.now()), username, u.name || username, u.role || 'user', 'pending', '', '', '', '', now, now]);
+      sheet.appendRow([u.id || ('u_' + Date.now()), cleanUser, u.name || cleanUser, u.role || 'user', 'pending', '', '', '', '', now, now, u.passHash || '']);
     }
     return jsonResponse({ status: 'ok', message: 'User registered to cloud' });
   }
+
+  if (action === 'update_pass_hash') {
+    const cleanUser = String(payload.username || '').replace(/^@+/, '').trim().toLowerCase();
+    const passHash = (payload.passHash || '').trim();
+    if (!cleanUser || !passHash) return jsonResponse({ status: 'error', message: 'Missing fields' });
+    for (let i = 1; i < data.length; i++) {
+      const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+      if (sheetUser === cleanUser) {
+        sheet.getRange(i + 1, 12).setValue(passHash);
+        sheet.getRange(i + 1, 11).setValue(new Date());
+        return jsonResponse({ status: 'ok', message: 'PassHash updated' });
+      }
+    }
+    return jsonResponse({ status: 'error', message: 'User not found' });
+  }
+
   if (action === 'confirm_user') {
-    const username = (payload.username || '').trim();
+    const rawUsername = (payload.username || '').trim();
+    const cleanUser = rawUsername.replace(/^@+/, '').trim();
+    const cleanUserLower = cleanUser.toLowerCase();
+    let name = (payload.name || '').trim();
     const pkgTitle = payload.packageTitle || 'แพ็กเกจมาตรฐาน';
     const expires = payload.expires || '';
     const now = new Date();
     let foundRow = -1, lineUserId = '';
+
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][1]).toLowerCase() === username.toLowerCase()) {
-        foundRow = i + 1; lineUserId = String(data[i][7] || '').trim(); break;
+      const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+      if (sheetUser === cleanUserLower) {
+        foundRow = i + 1;
+        lineUserId = String(data[i][7] || '').trim();
+        if (!name && data[i][2]) name = String(data[i][2]).trim();
+        break;
       }
     }
+
     if (foundRow > 0) {
+      sheet.getRange(foundRow, 2).setValue(cleanUser);
       sheet.getRange(foundRow, 5).setValue('active');
       sheet.getRange(foundRow, 6).setValue(pkgTitle);
       sheet.getRange(foundRow, 7).setValue(expires || 'ตลอดชีพ');
       sheet.getRange(foundRow, 11).setValue(now);
+      if (name) sheet.getRange(foundRow, 3).setValue(name);
     }
+
     let lineSent = false;
     if (lineUserId) {
-      const expiryDisplay = expires ? new Date(expires).toLocaleDateString('th-TH') : 'ใช้งานได้ตลอดชีพ';
-      const pushText = "🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้คุณเรียบร้อยแล้วครับ!\\n\\n👤 ไอดี: @" + username + "\\n📦 แพ็กเกจ: " + pkgTitle + "\\n📅 วันหมดอายุ: " + expiryDisplay + "\\n\\n🔗 เข้าสู่ระบบและทำแบบทดสอบได้ทันที:\\n" + WEB_APP_URL + "\\n\\nขอให้ทำคะแนนได้ตามเป้าหมายครับ ✌️✨";
+      const expiryDisplay = expires
+        ? (String(expires).includes('ตลอดชีพ') ? 'ใช้งานได้ตลอดชีพ (ไม่มีวันหมดอายุ)' : new Date(expires).toLocaleDateString('th-TH'))
+        : 'ใช้งานได้ตลอดชีพ (ไม่มีวันหมดอายุ)';
+      const displayName = (name || cleanUser || '').trim();
+      const pushText = "สวัสดี " + displayName + " 👋\\n🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้เรียบร้อยแล้ว\\n\\n👤 ID: " + cleanUser + "\\n📦 แพ็กเกจ: " + pkgTitle + "\\n📅 วันหมดอายุ: " + expiryDisplay + "\\n\\n🔗 เข้าสู่ระบบและเริ่มทำแบบทดสอบได้ทันที:\\n" + WEB_APP_URL + "\\n\\nขอให้ตั้งใจฝึกฝนและทำคะแนนได้ตามเป้าหมาย ✌️✨";
       lineSent = pushLineMessage(lineUserId, pushText);
     }
-    return jsonResponse({ status: 'ok', username, lineSent });
+    return jsonResponse({ status: 'ok', username: cleanUser, lineSent: lineSent, hasLineId: !!lineUserId });
   }
+
+  if (action === 'delete_user') {
+    const cleanUser = String(payload.username || '').replace(/^@+/, '').trim().toLowerCase();
+    if (!cleanUser) return jsonResponse({ status: 'error', message: 'Missing username' });
+    for (let i = 1; i < data.length; i++) {
+      const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+      if (sheetUser === cleanUser) {
+        sheet.deleteRow(i + 1);
+        return jsonResponse({ status: 'ok', message: 'User deleted from cloud' });
+      }
+    }
+    return jsonResponse({ status: 'ok', message: 'User not found in cloud' });
+  }
+
   return jsonResponse({ status: 'error', message: 'Unknown action' });
 }
 
@@ -130,46 +215,114 @@ function handleLineTextMessage(event) {
   const replyToken = event.replyToken;
   const userText = (event.message.text || '').trim();
   const lower = userText.toLowerCase();
-  const lineUserId = event.source.userId || '';
-  const userMatch = userText.match(/@([a-zA-Z0-9._-]+)/) || userText.match(/(?:ไอดี|username|user)\\s*[:=]?\\s*([a-zA-Z0-9._-]+)/i);
+  const lineUserId = (event.source && event.source.userId) || '';
+
+  let extractedName = '';
+  const nameMatch = userText.match(/(?:ชื่อ|name)\\s*[:=•]?\\s*([^\\n\\r•]+)/i);
+  if (nameMatch && nameMatch[1]) extractedName = nameMatch[1].trim();
+
+  let extractedUser = '';
+  const userMatch = userText.match(/(?:ไอดี|id|username|user)\\s*[:=•]?\\s*@?([a-zA-Z0-9._-]+)/i) || userText.match(/@([a-zA-Z0-9._-]+)/);
   if (userMatch && userMatch[1]) {
-    const rawUsername = userMatch[1].trim();
-    linkLineUserWithUsername(rawUsername, lineUserId);
-    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ @" + rawUsername + " แล้ว]\\n\\nสวัสดีครับ @" + rawUsername + " 👋\\nระบบได้เชื่อมต่อ LINE กับไอดีในระบบเรียบร้อยแล้วครับ!\\n\\n⏳ สถานะ: รอแอดมินคอนเฟิร์มแพ็กเกจ\\nเมื่อแอดมินกดคอนเฟิร์มในระบบ จะมีข้อความแจ้งเตือนมายังแชทนี้ทันทีครับ 😊";
+    extractedUser = userMatch[1].replace(/^@+/, '').trim();
+  } else if (/^[a-zA-Z0-9._-]{4,30}$/.test(userText) && !/^(1|2|3|4|menu|help)$/i.test(userText)) {
+    extractedUser = userText.replace(/^@+/, '').trim();
+  }
+
+  if (extractedUser) {
+    const resolvedName = linkLineUserWithUsername(extractedUser, lineUserId, extractedName);
+    const displayName = resolvedName || extractedName || extractedUser;
+    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดี " + displayName + " 👋\\nระบบได้เชื่อมต่อบัญชี LINE กับไอดี " + extractedUser + " เรียบร้อยแล้ว!\\n\\n⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) ยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊";
     return sendLineReply(replyToken, [{ type: 'text', text: replyText, quickReply: getQuickReplyMenu() }]);
   }
-  if (lower.startsWith('1') || lower.includes('ยืนยัน') || lower.includes('ขอสิทธิ์')) {
-    const replyText = "🔑 [1. ขอยืนยันสิทธิ์เข้าใช้งานระบบ TestSkill]\\n\\nสวัสดีครับ 👋 กรุณาพิมพ์แจ้ง \\"ไอดี\\" ของท่านในแชทนี้ได้เลยครับ เช่น:\\n👉 @ไอดีของคุณ (เช่น @KruThai2026)\\n\\nเมื่อแอดมินกดคอนเฟิร์มในระบบ จะมีข้อความแจ้งเตือนกลับมาที่นี่ทันทีครับ!";
+
+  if (lower.startsWith('1') || lower.includes('ยืนยัน') || lower.includes('ขอสิทธิ์') || lower.includes('อนุมัติ') || lower.includes('ต่ออายุ')) {
+    const replyText = "🔑 [1. ขอยืนยันสิทธิ์เข้าใช้งานระบบ TestSkill]\\n\\nสวัสดี 👋 เพื่อให้ระบบส่งแจ้งเตือนกลับหาท่านได้อัตโนมัติ:\\nกรุณาพิมพ์แจ้ง \\"ID\\" ของท่านในแชทนี้ได้เลย เช่น:\\n👉 ID: KruThai2026\\n\\n(หากยังไม่ได้สมัครสมาชิก สามารถกดสมัครได้ที่เว็บ: " + WEB_APP_URL + "#/register)\\n\\nเมื่อแอดมิน (คุณภาณุวัฒน์) กดยืนยันในระบบ จะมีข้อความแจ้งเตือนอัตโนมัติส่งกลับมาที่นี่ทันที!";
     sendLineReply(replyToken, [{ type: 'text', text: replyText, quickReply: getQuickReplyMenu() }]);
   } else if (lower.startsWith('2') || lower.includes('ผู้พัฒนา') || lower.includes('ติดต่อ')) {
-    sendLineReply(replyToken, [{ type: 'text', text: "👨‍💻 ติดต่อผู้ดูแลระบบโดยตรง:\\n• ผู้พัฒนา: คุณภาณุวัฒน์ (แอดมิน)\\n• Line ID: Panuwat_99999\\nยินดีให้บริการครับ 😊", quickReply: getQuickReplyMenu() }]);
-  } else if (lower.startsWith('3') || lower.includes('ปัญหา')) {
-    sendLineReply(replyToken, [{ type: 'text', text: "🛠️ แจ้งปัญหาการใช้งาน:\\nกรุณาระบุชุดข้อสอบและข้อที่พบปัญหา พร้อมภาพหน้าจอ ทีมงานจะตรวจสอบและแก้ไขให้ทันทีครับ ขอบคุณครับ!", quickReply: getQuickReplyMenu() }]);
-  } else if (lower.startsWith('4') || lower.includes('สอบถาม')) {
-    sendLineReply(replyToken, [{ type: 'text', text: "❓ สอบถามข้อมูล:\\n📘 ระบบสอบออนไลน์ TestSkill By กลางฟู คลังข้อสอบ 3,225 ข้อ พร้อมเกร็ดความรู้และ AI วิเคราะห์ผล\\nพิมพ์คำถามทิ้งไว้ได้เลยครับ!", quickReply: getQuickReplyMenu() }]);
+    sendLineReply(replyToken, [{ type: 'text', text: "👨‍💻 [2. ติดต่อผู้พัฒนาระบบ TestSkill]\\n\\nคุณกำลังติดต่อผู้สร้างและพัฒนาระบบโดยตรง:\\n• ผู้พัฒนา: คุณภาณุวัฒน์ (แอดมิน)\\n• Line ID ส่วนตัว: Panuwat_99999\\n• ระบบสอบออนไลน์เตรียมความพร้อมใบประกอบวิชาชีพครู By กลางฟู\\n\\nท่านสามารถพิมพ์ข้อความ ข้อเสนอแนะ หรือคำถามทิ้งไว้ในแชทนี้ได้เลย แอดมินจะรีบเข้ามาตอบกลับโดยเร็วที่สุด 😊", quickReply: getQuickReplyMenu() }]);
+  } else if (lower.startsWith('3') || lower.includes('ปัญหา') || lower.includes('บั๊ก') || lower.includes('bug')) {
+    sendLineReply(replyToken, [{ type: 'text', text: "🛠️ [3. แจ้งปัญหาการใช้งาน / พบข้อผิดพลาด]\\n\\nขออภัยในความไม่สะดวก เพื่อความรวดเร็วในการแก้ไข กรุณาระบุข้อมูลดังนี้:\\n1. ชุดข้อสอบและข้อที่พบปัญหา (เช่น ชุดที่ 5 ข้อที่ 12)\\n2. อาการของปัญหา (เช่น เฉลยผิด, หน้าจอค้าง, บันทึกคะแนนไม่ได้)\\n3. รูปภาพหน้าจอ (Screenshot) หากสะดวกแนบมา\\n\\nทีมงานจะตรวจสอบและปรับปรุงแก้ไขระบบให้ทันที ขอบคุณ!", quickReply: getQuickReplyMenu() }]);
+  } else if (lower.startsWith('4') || lower.includes('สอบถาม') || lower.includes('แพ็กเกจ') || lower.includes('ราคา')) {
+    sendLineReply(replyToken, [{ type: 'text', text: "❓ [4. สอบถามข้อมูลเพิ่มเติม TestSkill]\\n\\n📘 ระบบสอบออนไลน์ TestSkill เตรียมสอบใบประกอบวิชาชีพครู By กลางฟู\\n• คลังข้อสอบตาม Test Blueprint 5 เรื่อง (930 ข้อ)\\n• ชุดรวมเทียบเคียงข้อสอบจริง 24 ชุด (2,295 ข้อ)\\n• ระบบจับเวลา บันทึกผลสอบ เฉลยละเอียดพร้อมเกร็ดความรู้ทุกข้อ และ AI วิเคราะห์ผลสอบ\\n\\nท่านสามารถพิมพ์คำถามหรือข้อสงสัยเพิ่มเติมส่งมาในแชทนี้ได้ตลอดเวลา!", quickReply: getQuickReplyMenu() }]);
   } else {
     replyMainMenu(replyToken);
   }
 }
 
-function linkLineUserWithUsername(username, lineUserId) {
-  if (!username || !lineUserId) return;
+function linkLineUserWithUsername(username, lineUserId, name = '') {
+  if (!username) return name || username;
+  const cleanUser = String(username).replace(/^@+/, '').trim();
+  const cleanUserLower = cleanUser.toLowerCase();
   const sheet = getDatabaseSheet('Users');
   const data = sheet.getDataRange().getValues();
+  let foundRow = -1;
+  let resolvedName = name || cleanUser;
+
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][1]).toLowerCase() === username.toLowerCase()) {
-      sheet.getRange(i + 1, 8).setValue(lineUserId);
-      sheet.getRange(i + 1, 11).setValue(new Date());
-      return;
+    const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+    if (sheetUser === cleanUserLower) {
+      foundRow = i + 1;
+      if (!name && data[i][2]) resolvedName = String(data[i][2]).trim();
+      break;
     }
   }
-  sheet.appendRow(['u_' + Date.now(), username, username, 'user', 'pending', '', '', lineUserId, '', new Date(), new Date()]);
+
+  const now = new Date();
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 2).setValue(cleanUser);
+    if (lineUserId) sheet.getRange(foundRow, 8).setValue(lineUserId);
+    sheet.getRange(foundRow, 11).setValue(now);
+    if (name) sheet.getRange(foundRow, 3).setValue(name);
+  } else {
+    sheet.appendRow(['u_' + Date.now(), cleanUser, resolvedName, 'user', 'pending', '', '', lineUserId || '', '', now, now, '']);
+  }
+  return resolvedName || cleanUser;
 }
 
 function replyMainMenu(replyToken) {
-  const msg = "สวัสดีครับ 👋 ยินดีต้อนรับสู่ LINE Official ของ TestSkill (By กลางฟู)\\n\\nเลือกหัวข้อที่ต้องการรับบริการ:\\n1️⃣ ยืนยันสิทธิ์ (ขอเปิดสิทธิ์ / ต่ออายุ)\\n2️⃣ ติดต่อผู้พัฒนา (คุณภาณุวัฒน์)\\n3️⃣ แจ้งปัญหาการใช้งาน\\n4️⃣ สอบถาม อื่นๆ\\n\\nพิมพ์หมายเลข 1-4 หรือพิมพ์ @ไอดีของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันทีครับ";
+  const msg = "สวัสดี 👋 ยินดีต้อนรับสู่ LINE Official ของระบบ TestSkill (By กลางฟู)\\n\\nกรุณาเลือกหัวข้อที่ต้องการรับบริการ:\\n1️⃣ ยืนยันสิทธิ์ (ขอเปิดสิทธิ์ / ต่ออายุ)\\n2️⃣ ติดต่อผู้พัฒนา (คุณภาณุวัฒน์)\\n3️⃣ แจ้งปัญหาการใช้งาน\\n4️⃣ สอบถาม อื่นๆ\\n\\n👉 พิมพ์หมายเลข 1, 2, 3 หรือ 4 หรือพิมพ์ ID ของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันที";
   sendLineReply(replyToken, [{ type: 'text', text: msg, quickReply: getQuickReplyMenu() }]);
 }
+
+function getQuickReplyMenu() {
+  return {
+    items: [
+      { type: 'action', action: { type: 'message', label: '1. ยืนยันสิทธิ์', text: '1. ยืนยันสิทธิ์ ขอเปิดสิทธิ์เข้าใช้งานระบบ' } },
+      { type: 'action', action: { type: 'message', label: '2. ติดต่อผู้พัฒนา', text: '2. ติดต่อผู้พัฒนา' } },
+      { type: 'action', action: { type: 'message', label: '3. แจ้งปัญหา', text: '3. แจ้งปัญหาการใช้งานระบบ' } },
+      { type: 'action', action: { type: 'message', label: '4. สอบถาม อื่นๆ', text: '4. สอบถาม อื่นๆ' } }
+    ]
+  };
+}
+
+function sendLineReply(replyToken, messages) {
+  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+    method: 'post', contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + CHANNEL_ACCESS_TOKEN },
+    payload: JSON.stringify({ replyToken: replyToken, messages: messages }),
+    muteHttpExceptions: true
+  });
+}
+
+function pushLineMessage(toUserId, text) {
+  if (!toUserId) return false;
+  try {
+    const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'post', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + CHANNEL_ACCESS_TOKEN },
+      payload: JSON.stringify({ to: toUserId, messages: [{ type: 'text', text: text }] }),
+      muteHttpExceptions: true
+    });
+    return res.getResponseCode() === 200;
+  } catch (err) {
+    return false;
+  }
+}
+function testSystem() {
+  const sheet = getDatabaseSheet('Users');
+  return 'OK - จำนวนแถว: ' + sheet.getLastRow();
+}`;
 
 function getQuickReplyMenu() {
   return {
@@ -613,16 +766,20 @@ async function packageApprovalDialog(user, mode = 'approve') {
             custom: 'แอดมินกำหนดเอง'
           }[selectedPkg] || 'แพ็กเกจ';
 
-          toast(`บันทึกสิทธิ์ @${user.username} เรียบร้อยแล้ว (${pkgName})`, 'success');
+          toast(`บันทึกสิทธิ์ ${user.name || user.username} เรียบร้อยแล้ว (${pkgName})`, 'success');
 
           // สั่งส่งสัญญาณคอนเฟิร์มขึ้น Cloud ให้ LINE Bot ยิงแจ้งเตือนเข้าแชทผู้ใช้โดยอัตโนมัติ
-          CloudSync.confirmUser({
+          const syncRes = await CloudSync.confirmUser({
             username: user.username,
             name: user.name,
             packageTitle: pkgName,
             expires: finalExpires,
             adminName: App.user?.name || 'ภาณุวัฒน์'
           });
+
+          if (syncRes?.lineSent) {
+            toast('✓ ระบบได้ส่งข้อความแจ้งเตือนเข้า LINE ของผู้ใช้เรียบร้อยแล้ว', 'success', 4000);
+          }
 
           // แสดงหน้าต่างสรุปและปุ่ม 1-Click ตอบกลับผ่าน LINE สำรอง
           setTimeout(() => {
@@ -641,8 +798,9 @@ async function packageApprovalDialog(user, mode = 'approve') {
                   <div class="confirm-done-tags" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
                     <span class="chip chip-success">✓ บันทึกแพ็กเกจ: ${esc(pkgName)}</span>
                     <span class="chip chip-muted">หมดอายุ: ${finalExpires ? new Date(finalExpires).toLocaleDateString('th-TH') : 'ใช้งานตลอดชีพ'}</span>
+                    ${syncRes?.lineSent ? '<span class="chip chip-success">📱 แจ้งเตือนเข้า LINE ผู้ใช้อัตโนมัติแล้ว ✓</span>' : '<span class="chip chip-warning">ℹ️ ผู้ใช้ยังไม่ได้ทัก LINE บอท (ไม่มี Line ID)</span>'}
                   </div>
-                  <p class="muted small">ระบบได้บันทึกสิทธิ์และซิงค์ข้อมูลขึ้น Cloud เรียบร้อยแล้ว แอดมินสามารถกดส่งข้อความคอนเฟิร์มเข้าแชท LINE ของผู้ใช้ หรือคัดลอกข้อความส่งทางแชทได้ทันที</p>
+                  <p class="muted small">${syncRes?.lineSent ? 'ระบบได้ยิงข้อความคอนเฟิร์มสิทธิ์เข้าแชท LINE ของผู้ใช้โดยตรงเรียบร้อยแล้ว' : 'ระบบได้บันทึกสิทธิ์ลงระบบเรียบร้อยแล้ว แอดมินสามารถกดปุ่ม "ส่งเข้า LINE ผู้ใช้" ด้านล่างเพื่อส่งข้อความคอนเฟิร์มให้ผู้ใช้ได้ทันที'}</p>
                   
                   <div class="field mt">
                     <span style="font-weight:600;margin-bottom:6px;display:block;">ข้อความตอบกลับผู้ใช้ (แสดงครบทุกบรรทัด):</span>

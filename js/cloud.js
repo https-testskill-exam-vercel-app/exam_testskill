@@ -184,25 +184,38 @@ const CloudSync = {
    */
   async confirmUser({ username, name, packageTitle, expires, adminName = 'ภาณุวัฒน์' }) {
     const url = this.getGasUrl();
-    if (!url) return false;
+    if (!url) return { ok: false, lineSent: false, hasLineId: false };
+    const cleanUser = String(username || '').replace(/^@+/, '').trim();
     try {
+      // 1. ส่งคำขอแบบ POST ขึ้น Google Apps Script
       await fetch(url, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: 'confirm_user',
-          username,
-          name,
+          username: cleanUser,
+          name: name || cleanUser,
           packageTitle,
           expires,
           adminName
         })
       });
-      return true;
+
+      // 2. เรียก GET ซ้ำเพื่อความชัวร์และดึงสถานะ lineSent กลับมา
+      try {
+        const getUrl = `${url}?action=confirm_user&username=${encodeURIComponent(cleanUser)}&name=${encodeURIComponent(name || cleanUser)}&package=${encodeURIComponent(packageTitle || '')}&expires=${encodeURIComponent(expires || '')}&t=${Date.now()}`;
+        const res = await fetch(getUrl);
+        if (res.ok) {
+          const data = await res.json();
+          return { ok: true, lineSent: !!data.lineSent, hasLineId: !!data.hasLineId };
+        }
+      } catch (e2) {}
+
+      return { ok: true, lineSent: false, hasLineId: false };
     } catch (e) {
       console.warn('CloudSync.confirmUser warning:', e);
-      return false;
+      return { ok: false, lineSent: false, hasLineId: false };
     }
   },
 
