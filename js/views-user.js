@@ -812,24 +812,22 @@ async function renderHome() {
       <a class="card tool-card" href="#/history"><span class="tool-icon">📈</span><div><b>ประวัติ & พัฒนาการ</b><small class="muted">ดูผลสอบย้อนหลังทั้งหมด</small></div></a>
     </section>
 
-    <section class="card dev-contact-card">
-      <div class="dev-contact-left">
-        <div class="dev-qr-wrap" data-open-qr title="คลิกเพื่อขยาย QR Code">
+    <div style="text-align:center;margin-top:1.5rem;">
+      <div class="footer-contact">
+        <button type="button" class="footer-qr-btn" data-open-qr title="คลิกเพื่อดู QR Code ขนาดใหญ่">
           <img src="assets/line-qr.jpg" alt="LINE QR Code">
-          <span class="dev-qr-zoom">🔍 คลิกเพื่อขยาย</span>
-        </div>
-        <div class="dev-contact-body">
-          <span class="chip chip-line"><span class="line-badge">LINE Bot</span> แชทอัตโนมัติ 24 ชม.</span>
-          <h3>ช่องทางการติดต่อ & ขอสิทธิ์ใช้งานระบบ</h3>
-          <p class="dev-line-id">Line Bot : <b>@430lkurz</b> <span class="muted small">(แอดมิน: Panuwat_99999)</span></p>
-          <p class="muted small">แอดไลน์เพื่อขอยืนยันสิทธิ์ ต่ออายุการใช้งาน แจ้งปัญหา หรือสอบถามข้อมูลเพิ่มเติมได้ตลอด 24 ชั่วโมง</p>
+        </button>
+        <div class="footer-contact-info">
+          <span class="footer-contact-label">ช่องทางการติดต่อ/แจ้งปัญหาการใช้งาน</span>
+          <div class="footer-line-row">
+            <span class="line-badge">LINE</span>
+            <b>Line ID : <span class="line-id-text">Panuwat_99999</span></b>
+            <button type="button" class="btn-copy-line" data-copy-line="Panuwat_99999">คัดลอก ID</button>
+            <button type="button" class="btn-copy-line" data-open-qr>สแกน QR</button>
+          </div>
         </div>
       </div>
-      <div class="dev-contact-actions">
-        <button type="button" class="btn btn-primary" data-open-qr>💬 ทักแชท LINE Bot</button>
-        <button type="button" class="btn btn-outline" data-copy-line="@430lkurz">📋 คัดลอกไอดีบอท</button>
-      </div>
-    </section>
+    </div>
   `, { active: 'home' });
 
   $$('[data-exam]').forEach((b) => (b.onclick = () => startExam(b.dataset.exam)));

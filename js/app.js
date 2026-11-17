@@ -249,20 +249,6 @@ function shell(content, { active = '' } = {}) {
   </header>
   <main class="container fade-in">${content}</main>
   <footer class="footer">
-    <div class="footer-contact">
-      <button type="button" class="footer-qr-btn" data-open-qr title="คลิกเพื่อดู QR Code ขนาดใหญ่">
-        <img src="assets/line-qr.jpg" alt="LINE QR Code">
-      </button>
-      <div class="footer-contact-info">
-        <span class="footer-contact-label">ช่องทางการติดต่อ ผู้สร้างและพัฒนาระบบ</span>
-        <div class="footer-line-row">
-          <span class="line-badge">LINE</span>
-          <b>Line ID : <span class="line-id-text">Panuwat_99999</span></b>
-          <button type="button" class="btn-copy-line" data-copy-line="Panuwat_99999">คัดลอก ID</button>
-          <button type="button" class="btn-copy-line" data-open-qr>สแกน QR</button>
-        </div>
-      </div>
-    </div>
     <div class="footer-copy">© ${new Date().getFullYear() + 543} ${APP_NAME} ${APP_BY} · อ้างอิงกรอบ Test Blueprint ของคุรุสภา</div>
   </footer>`;
   bindShell();
