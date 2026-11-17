@@ -308,6 +308,7 @@ function renderLogin(initialTab = 'login') {
 
       try {
         const passHash = await hashPassword(username, password);
+        await Repo.unmarkUserDeleted(username);
         const newUser = {
           id: uid('u_'),
           username,

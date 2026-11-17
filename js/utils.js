@@ -68,8 +68,9 @@ function addDaysToDate(baseStr, days) {
 }
 
 function fmtExpiryBadge(expiresStr) {
-  if (!expiresStr) return '<span class="chip chip-primary chip-xs">👑 ตลอดชีพ</span>';
+  if (!expiresStr || String(expiresStr).includes('ตลอดชีพ') || expiresStr === 'lifetime') return '<span class="chip chip-primary chip-xs">👑 ตลอดชีพ</span>';
   const rem = calcDaysRemaining(expiresStr);
+  if (rem === null) return '<span class="chip chip-primary chip-xs">👑 ตลอดชีพ</span>';
   if (rem < 0) return `<span class="chip chip-danger chip-xs">🔴 หมดอายุแล้ว (${Math.abs(rem)} วันก่อน)</span>`;
   if (rem === 0) return '<span class="chip chip-warning chip-xs">⚠️ หมดอายุวันนี้</span>';
   if (rem <= 7) return `<span class="chip chip-warning chip-xs">⚠️ เหลือ ${rem} วัน</span>`;

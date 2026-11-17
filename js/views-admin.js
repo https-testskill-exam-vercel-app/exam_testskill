@@ -350,7 +350,7 @@ async function adminUsers(el) {
         <td>
           <div class="user-expiry-cell">
             ${fmtExpiryBadge(u.expires)}
-            ${u.expires ? `<small class="muted">${new Date(u.expires).toLocaleDateString('th-TH')}</small>` : ''}
+            ${(u.expires && !String(u.expires).includes('ตลอดชีพ')) ? `<small class="muted">${new Date(u.expires).toLocaleDateString('th-TH')}</small>` : ''}
           </div>
         </td>
         <td>
@@ -452,10 +452,16 @@ async function adminUsers(el) {
 
   $$('[data-del]').forEach((b) => (b.onclick = async () => {
     const u = users.find((x) => x.id === b.dataset.del);
-    if (!(await confirmBox('ลบผู้ใช้?', `ลบบัญชี <b>${esc(u.username)}</b> และประวัติการสอบทั้งหมด`, 'ลบ', true))) return;
+    if (!u) return;
+    if (!(await confirmBox('ลบผู้ใช้?', `ลบบัญชี <b>${esc(u.username)}</b> และประวัติการสอบทั้งหมดออกจากระบบและ Cloud (Google Sheet)`, 'ลบ', true))) return;
+    await Repo.markUserDeleted(u.username);
     await Repo.saveUsers(users.filter((x) => x.id !== u.id));
     for (const k of [...(await DB.keys(`progress:${u.id}:`)), 'history:' + u.id, 'seen:' + u.id, 'wrong:' + u.id, 'bookmark:' + u.id]) await DB.del(k);
-    toast('ลบผู้ใช้แล้ว', 'success'); go('/admin/users');
+    if (typeof CloudSync !== 'undefined' && CloudSync.deleteUser) {
+      CloudSync.deleteUser(u.username).catch(() => {});
+    }
+    toast('ลบผู้ใช้ทั้งในระบบและ Cloud เรียบร้อยแล้ว', 'success');
+    await adminUsers(el);
   }));
   $$('[data-hist]').forEach((b) => (b.onclick = async () => {
     const u = users.find((x) => x.id === b.dataset.hist);

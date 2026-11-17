@@ -278,6 +278,19 @@ ${WEB_APP_URL}
     });
   }
 
+  // 4. สั่งลบผู้ใช้ออกจาก Google Sheet
+  if (action === 'delete_user') {
+    const username = (payload.username || '').trim();
+    if (!username) return jsonResponse({ status: 'error', message: 'Missing username' });
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase() === username.toLowerCase()) {
+        sheet.deleteRow(i + 1);
+        return jsonResponse({ status: 'ok', message: 'User deleted from cloud' });
+      }
+    }
+    return jsonResponse({ status: 'ok', message: 'User not found in cloud' });
+  }
+
   return jsonResponse({ status: 'error', message: 'Unknown action' });
 }
 

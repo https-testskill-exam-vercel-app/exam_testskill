@@ -225,17 +225,45 @@ const CloudSync = {
   },
 
   /**
+   * สั่งลบผู้ใช้ออกจาก Cloud (Google Sheet)
+   */
+  async deleteUser(username) {
+    const url = this.getGasUrl();
+    if (!url || !username) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'delete_user',
+          username: String(username).trim()
+        })
+      });
+      return true;
+    } catch (e) {
+      console.warn('CloudSync.deleteUser warning:', e);
+      return false;
+    }
+  },
+
+  /**
    * ซิงค์ผู้ใช้จาก Cloud เข้ามาผสานกับ IndexedDB ในเครื่อง
    */
   async syncUsers() {
     const cloudUsers = await this.fetchUsersFromCloud();
     if (!cloudUsers.length) return { added: 0, updated: 0 };
     const localUsers = await Repo.getUsers();
+    const deletedUsernames = (await Repo.getDeletedUsernames()) || [];
     let added = 0, updated = 0;
 
     for (const cu of cloudUsers) {
       if (!cu.username) continue;
-      const idx = localUsers.findIndex((u) => u.username.toLowerCase() === cu.username.toLowerCase());
+      const cleanUser = cu.username.toLowerCase();
+      // ถ้าแอดมินลบผู้ใช้นี้ไปแล้ว ไม่ต้องดึงกลับมาอีก!
+      if (deletedUsernames.includes(cleanUser)) continue;
+
+      const idx = localUsers.findIndex((u) => u.username.toLowerCase() === cleanUser);
       if (idx >= 0) {
         // อัปเดตข้อมูลสถานะถ้ามี
         const local = localUsers[idx];

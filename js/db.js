@@ -179,6 +179,24 @@ const Repo = {
     await Repo.saveUsers(list);
     return list[i];
   },
+  async getDeletedUsernames() {
+    return (await DB.get('deleted_users')) || [];
+  },
+  async markUserDeleted(username) {
+    if (!username) return;
+    const clean = String(username).trim().toLowerCase();
+    const list = await Repo.getDeletedUsernames();
+    if (!list.includes(clean)) {
+      list.push(clean);
+      await DB.set('deleted_users', list);
+    }
+  },
+  async unmarkUserDeleted(username) {
+    if (!username) return;
+    const clean = String(username).trim().toLowerCase();
+    const list = (await Repo.getDeletedUsernames()).filter((x) => x !== clean);
+    await DB.set('deleted_users', list);
+  },
 
   /* question bank */
   async getBank(sid) { return (await DB.get('bank:' + sid)) || []; },
