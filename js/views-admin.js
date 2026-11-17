@@ -324,41 +324,6 @@ function testSystem() {
   return 'OK - จำนวนแถว: ' + sheet.getLastRow();
 }`;
 
-function getQuickReplyMenu() {
-  return {
-    items: [
-      { type: 'action', action: { type: 'message', label: '1. ยืนยันสิทธิ์', text: '1. ยืนยันสิทธิ์' } },
-      { type: 'action', action: { type: 'message', label: '2. ติดต่อผู้พัฒนา', text: '2. ติดต่อผู้พัฒนา' } },
-      { type: 'action', action: { type: 'message', label: '3. แจ้งปัญหา', text: '3. แจ้งปัญหาการใช้งาน' } },
-      { type: 'action', action: { type: 'message', label: '4. สอบถาม อื่นๆ', text: '4. สอบถาม อื่นๆ' } }
-    ]
-  };
-}
-
-function sendLineReply(replyToken, messages) {
-  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
-    method: 'post', contentType: 'application/json',
-    headers: { Authorization: 'Bearer ' + CHANNEL_ACCESS_TOKEN },
-    payload: JSON.stringify({ replyToken: replyToken, messages: messages }),
-    muteHttpExceptions: true
-  });
-}
-
-function pushLineMessage(toUserId, text) {
-  if (!toUserId) return false;
-  try {
-    const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'post', contentType: 'application/json',
-      headers: { Authorization: 'Bearer ' + CHANNEL_ACCESS_TOKEN },
-      payload: JSON.stringify({ to: toUserId, messages: [{ type: 'text', text: text }] }),
-      muteHttpExceptions: true
-    });
-    return res.getResponseCode() === 200;
-  } catch (err) {
-    return false;
-  }
-}`;
-
 const NODE_BOT_SCRIPT_TEMPLATE = `const express = require('express');
 const line = require('@line/bot-sdk');
 
