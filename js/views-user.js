@@ -87,7 +87,7 @@ function renderLogin(initialTab = 'login') {
                 <ul class="register-guide-list">
                   <li>ความยาว <b>8 ตัวอักษรขึ้นไป</b> (8–32 ตัว)</li>
                   <li>ต้องเป็น <b>ตัวอักษรภาษาอังกฤษผสมตัวเลข (A-Z, a-z, 0-9)</b> ทั้งไอดีและรหัสผ่าน</li>
-                  <li><b>ไม่ต้องใส่เครื่องหมาย @ นำหน้าไอดี</b> (เช่น ตั้งเป็น KruThai2026 ได้เลย)</li>
+                  <li><b>ไม่ต้องใส่เครื่องหมาย @ นำหน้าไอดี</b> (เช่น ตั้งเป็น Banana009 ได้เลย)</li>
                   <li>เมื่อสมัครเสร็จสิ้น ให้<b>ติดต่อผู้ดูแลระบบทาง LINE</b> เพื่อขออนุมัติสิทธิ์เข้าใช้งาน</li>
                 </ul>
               </div>
@@ -100,7 +100,7 @@ function renderLogin(initialTab = 'login') {
 
                 <label class="field">
                   <span>2. ตั้งชื่อผู้ใช้ / ไอดี (สำหรับล็อกอิน)</span>
-                  <input class="input input-rounded" name="regUsername" id="regUsername" placeholder="เช่น KruThai2026 (ไม่ต้องใส่ @ นำหน้า)" required>
+                  <input class="input input-rounded" name="regUsername" id="regUsername" placeholder="เช่น Banana009 (ไม่ต้องใส่ @ นำหน้า)" required>
                   <div class="cred-hints" id="userHints">
                     <span class="hint-chip" data-rule="len">8 ตัวขึ้นไป</span>
                     <span class="hint-chip" data-rule="letter">ภาษาอังกฤษ (A-Z)</span>
