@@ -13,6 +13,7 @@ async function renderQuiz(examId) {
   let selected = null, finished = false, dirty = false;
   const title = Exams.title(examId);
 
+  if (typeof hideSystemLoader === 'function') hideSystemLoader();
   document.getElementById('app').innerHTML = `
   <div class="quiz-page fade-in">
     <header class="quiz-top"><div class="quiz-top-inner">

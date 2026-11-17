@@ -12,11 +12,27 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Prompt:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20261117_15">
+  <link rel="stylesheet" href="css/style.css?v=20261117_16">
   <script>document.documentElement.dataset.theme = localStorage.getItem('kf-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');</script>
 </head>
 <body>
-  <div id="app"><div class="boot"><span class="spinner"></span></div></div>
+  <div id="app">
+    <div class="system-loader-overlay">
+      <div class="system-loader-card">
+        <div class="logo-orbit-wrap">
+          <div class="logo-orbit-pulse"></div>
+          <div class="logo-orbit-ring-glow"></div>
+          <div class="logo-orbit-ring"></div>
+          <div class="logo-orbit-orb"></div>
+          <img src="assets/logo-testskill.jpg" alt="TestSkill" class="logo-orbit-img">
+        </div>
+        <h3 class="system-loader-title">ติวสอบใบประกอบวิชาชีพครู</h3>
+        <p class="system-loader-sub">กำลังเตรียมระบบและคลังข้อสอบ 3,225 ข้อ กรุณารอสักครู่…</p>
+        <div class="system-loader-bar"><div class="system-loader-bar-fill"></div></div>
+      </div>
+    </div>
+  </div>
+  <div id="system-loader-root"></div>
   <div id="modal-root"></div>
   <div id="toast-root" aria-live="polite"></div>
 
@@ -53,14 +69,14 @@
   <script src="js/questions-mock21.js" defer></script>
   <script src="js/questions-mock22.js" defer></script>
   <script src="js/questions-final.js" defer></script>
-  <script src="js/utils.js?v=20261117_15" defer></script>
-  <script src="js/db.js?v=20261117_15" defer></script>
-  <script src="js/cloud.js?v=20261117_15" defer></script>
-  <script src="js/ai.js?v=20261117_15" defer></script>
-  <script src="js/importer.js?v=20261117_15" defer></script>
-  <script src="js/views-user.js?v=20261117_15" defer></script>
-  <script src="js/views-quiz.js?v=20261117_15" defer></script>
-  <script src="js/views-admin.js?v=20261117_15" defer></script>
-  <script src="js/app.js?v=20261117_15" defer></script>
+  <script src="js/utils.js?v=20261117_16" defer></script>
+  <script src="js/db.js?v=20261117_16" defer></script>
+  <script src="js/cloud.js?v=20261117_16" defer></script>
+  <script src="js/ai.js?v=20261117_16" defer></script>
+  <script src="js/importer.js?v=20261117_16" defer></script>
+  <script src="js/views-user.js?v=20261117_16" defer></script>
+  <script src="js/views-quiz.js?v=20261117_16" defer></script>
+  <script src="js/views-admin.js?v=20261117_16" defer></script>
+  <script src="js/app.js?v=20261117_16" defer></script>
 </body>
 </html>

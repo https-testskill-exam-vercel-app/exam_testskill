@@ -208,3 +208,68 @@ const readAsText = (file) => new Promise((res, rej) => { const r = new FileReade
 const readAsArrayBuffer = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsArrayBuffer(file); });
 const readAsDataURL = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
 const readAsBase64 = async (blob) => (await readAsDataURL(blob)).split(',')[1];
+
+/**
+ * แสดงหน้าโหลดแบบเต็มจอ พร้อมเส้นแสงวิ่งวนรอบสัญลักษณ์โลโก้ของระบบ
+ * @param {string} title ข้อความหลัก
+ * @param {string} subtitle ข้อความรายละเอียด
+ */
+function showSystemLoader(title = 'กำลังเตรียมข้อมูลระบบ…', subtitle = 'กรุณารอสักครู่ ระบบกำลังจัดเตรียมข้อมูล') {
+  let el = document.getElementById('system-loader-root');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'system-loader-root';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `
+    <div class="system-loader-overlay fade-in">
+      <div class="system-loader-card">
+        <div class="logo-orbit-wrap">
+          <div class="logo-orbit-pulse"></div>
+          <div class="logo-orbit-ring-glow"></div>
+          <div class="logo-orbit-ring"></div>
+          <div class="logo-orbit-orb"></div>
+          <img src="assets/logo-testskill.jpg" alt="TestSkill" class="logo-orbit-img">
+        </div>
+        <h3 class="system-loader-title">${esc(title)}</h3>
+        <p class="system-loader-sub">${esc(subtitle)}</p>
+        <div class="system-loader-bar"><div class="system-loader-bar-fill"></div></div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * ซ่อนหน้าโหลดเต็มจอ
+ */
+function hideSystemLoader() {
+  const el = document.getElementById('system-loader-root');
+  if (el) {
+    const overlay = el.querySelector('.system-loader-overlay');
+    if (overlay) {
+      overlay.style.animation = 'fadeOut 0.25s forwards';
+      setTimeout(() => el.remove(), 250);
+    } else {
+      el.remove();
+    }
+  }
+}
+
+/**
+ * คืนค่า HTML สัญลักษณ์โลโก้พร้อมเส้นแสงวิ่งวนรอบ สำหรับนำไปแสดงในจุดที่กำลังโหลดข้อมูล
+ */
+function logoLoaderHTML(title = 'กำลังเตรียมข้อมูล…', subtitle = 'กรุณารอสักครู่') {
+  return `
+    <div class="logo-loader-container fade-in">
+      <div class="logo-orbit-wrap">
+        <div class="logo-orbit-pulse"></div>
+        <div class="logo-orbit-ring-glow"></div>
+        <div class="logo-orbit-ring"></div>
+        <div class="logo-orbit-orb"></div>
+        <img src="assets/logo-testskill.jpg" alt="TestSkill" class="logo-orbit-img">
+      </div>
+      <div class="system-loader-title">${esc(title)}</div>
+      <div class="system-loader-sub">${esc(subtitle)}</div>
+    </div>
+  `;
+}

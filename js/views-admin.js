@@ -406,7 +406,7 @@ async function renderAdmin(tab, arg) {
     <nav class="tabs">${tabs.map(([k, l]) => `<a href="#/admin/${k}" class="${tab === k || (!tab && k === 'users') || (tab === 'questions' && k === 'bank') ? 'active' : ''}">${l}</a>`).join('')}</nav>`;
   const views = { users: adminUsers, overview: adminOverview, bank: adminBank, questions: adminQuestions, summary: adminSummary, settings: adminSettings };
   const fn = views[tab] || adminUsers;
-  shell(head + '<div id="adminBody"><div class="ai-loading"><span class="spinner"></span> กำลังโหลด…</div></div>', { active: 'admin' });
+  shell(head + '<div id="adminBody">' + logoLoaderHTML('กำลังโหลดข้อมูลผู้ดูแลระบบ…', 'จัดเตรียมข้อมูลผู้ใช้งานและคำขอสิทธิ์') + '</div>', { active: 'admin' });
   await fn($('#adminBody'), arg);
 }
 window.renderAdmin = renderAdmin;
@@ -503,7 +503,9 @@ async function adminUsers(el) {
         const expired = u.expires && u.expires < today;
         const isPending = !u.active && u.pendingApproval;
         const role = u.role === 'admin' ? 'admin' : 'user';
-        const allowedPerms = PERM_KEYS.filter(([k]) => u.perms?.[k]);
+        const allowedPerms = (u.active && (!u.perms || Object.keys(u.perms).length === 0))
+          ? PERM_KEYS
+          : PERM_KEYS.filter(([k]) => u.perms?.[k] !== false);
 
         return `<tr data-q="${esc((u.username + ' ' + (u.name || '')).toLowerCase())}" data-role="${role}" data-pending="${isPending ? '1' : '0'}" style="${isPending ? 'background:rgba(234, 179, 8, 0.06);' : ''}">
         <td><b>${esc(u.name || '-')}</b><br><small class="muted">@${esc(u.username)}</small>
@@ -580,6 +582,7 @@ async function adminUsers(el) {
     const btn = e.currentTarget;
     btn.disabled = true;
     btn.innerHTML = '⏳ กำลังซิงค์…';
+    showSystemLoader('กำลังเชื่อมต่อ Cloud และ LINE Bot…', 'ระบบกำลังตรวจจับคำขอสมัครและยืนยันสิทธิ์ล่าสุดจาก Google Sheets');
     try {
       if (typeof CloudSync === 'undefined') {
         throw new Error('ระบบ CloudSync กำลังโหลด กรุณารีเฟรชหน้าเว็บอีกครั้ง');
@@ -594,6 +597,7 @@ async function adminUsers(el) {
     } catch (err) {
       toast('ซิงค์ล้มเหลว: ' + err.message, 'error');
     } finally {
+      hideSystemLoader();
       btn.disabled = false;
       btn.innerHTML = '☁️ ซิงค์จาก Cloud <span style="display:inline-block;width:7px;height:7px;background:#10b981;border-radius:50%;margin-left:4px;"></span>';
     }
@@ -638,7 +642,15 @@ async function adminUsers(el) {
   }, 10000);
 
   $$('[data-edit]').forEach((b) => (b.onclick = () => userForm(users.find((u) => u.id === b.dataset.edit))));
-  $$('[data-toggle]').forEach((c) => (c.onchange = async () => { await Repo.updateUser(c.dataset.toggle, { active: c.checked, pendingApproval: false }); toast(c.checked ? 'เปิดใช้งานบัญชีแล้ว' : 'ระงับบัญชีแล้ว', 'success'); }));
+  $$('[data-toggle]').forEach((c) => (c.onchange = async () => {
+    const target = users.find((u) => u.id === c.dataset.toggle);
+    const updateData = { active: c.checked, pendingApproval: false };
+    if (c.checked && (!target?.perms || Object.keys(target.perms).length === 0)) {
+      updateData.perms = { '01': true, '02': true, '03': true, '04': true, '05': true, 'final': true };
+    }
+    await Repo.updateUser(c.dataset.toggle, updateData);
+    toast(c.checked ? 'เปิดใช้งานบัญชีและอนุญาตทุกชุดข้อสอบแล้ว' : 'ระงับบัญชีแล้ว', 'success');
+  }));
   
   // กดอนุมัติสิทธิ์ → เปิดหน้าต่างเลือกแพ็กเกจ
   $$('[data-approve]').forEach((b) => (b.onclick = async () => {
@@ -995,7 +1007,7 @@ async function userForm(user) {
       <label class="field field-inline"><input type="checkbox" name="active" ${u.active ? 'checked' : ''} ${u.id === App.user.id ? 'disabled' : ''}> <span>เปิดใช้งานบัญชี</span></label>
     </div>
     <div class="field"><span>สิทธิ์การเข้าถึงชุดข้อสอบ <button type="button" class="link-btn" id="permAll">เลือกทั้งหมด</button> · <button type="button" class="link-btn" id="permNone">ล้าง</button></span>
-      <div class="perm-grid">${PERM_KEYS.map(([k, l]) => `<label class="perm-item"><input type="checkbox" name="perm" value="${k}" ${u.perms?.[k] ? 'checked' : ''}> ${l}${k !== 'final' ? `<small class="muted">${esc(subjectById(k).short)}</small>` : '<small class="muted">คละ 100 ข้อ</small>'}</label>`).join('')}</div>
+      <div class="perm-grid">${PERM_KEYS.map(([k, l]) => `<label class="perm-item"><input type="checkbox" name="perm" value="${k}" ${u.perms?.[k] !== false ? 'checked' : ''}> ${l}${k !== 'final' ? `<small class="muted">${esc(subjectById(k).short)}</small>` : '<small class="muted">คละ 100 ข้อ</small>'}</label>`).join('')}</div>
       <small class="muted">ผู้ดูแลระบบเข้าถึงได้ทุกชุดโดยอัตโนมัติ</small></div>`,
     onMount: (b) => {
       b.querySelector('#permAll').onclick = () => b.querySelectorAll('[name=perm]').forEach((c) => (c.checked = true));

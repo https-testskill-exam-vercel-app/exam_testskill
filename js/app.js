@@ -88,15 +88,26 @@ const Auth = {
             u.pendingApproval = cu.pendingApproval;
             u.package = cu.package || u.package;
             u.expires = cu.expires || u.expires;
+            if (u.active && !u.pendingApproval) {
+              if (!u.perms || Object.keys(u.perms).length === 0) {
+                u.perms = { '01': true, '02': true, '03': true, '04': true, '05': true, 'final': true };
+              }
+            }
             await Repo.updateUser(u.id, {
               active: u.active,
               pendingApproval: u.pendingApproval,
               package: u.package,
-              expires: u.expires
+              expires: u.expires,
+              perms: u.perms
             });
           }
         }
       } catch {}
+      // ถ้าผู้ใช้งาน active แล้ว แต่ perms ยังว่างเปล่า ให้เปิดให้ครบทุกชุด
+      if (u.active && !u.pendingApproval && (!u.perms || Object.keys(u.perms).length === 0)) {
+        u.perms = { '01': true, '02': true, '03': true, '04': true, '05': true, 'final': true };
+        await Repo.updateUser(u.id, { perms: u.perms });
+      }
       Auth.checkAllowed(u);
       return u;
     } catch { localStorage.removeItem('kf-session'); return null; }
@@ -109,7 +120,15 @@ const Auth = {
   can(user, perm) {
     if (!user) return false;
     if (user.role === 'admin' || !perm) return true;
-    return !!(user.perms && user.perms[perm]);
+    // ถ้าผู้ใช้ถูกระงับสิทธิ์ หรืออยู่ระหว่างรออนุมัติ หรือหมดอายุ -> ไม่มีสิทธิ์
+    if (!user.active || user.pendingApproval) return false;
+    if (user.expires && new Date(user.expires + 'T23:59:59') < new Date()) return false;
+    // ถ้าผู้ดูแลระบบระบุสิทธิ์เฉพาะเจาะจงไว้ (กำหนด true หรือ false) ให้ตรวจตามนั้น
+    if (user.perms && typeof user.perms[perm] !== 'undefined') {
+      return !!user.perms[perm];
+    }
+    // สำหรับผู้ใช้งานที่แอดมินอนุมัติแล้ว (active) และไม่หมดอายุ ให้เข้าถึงข้อสอบได้ทั้งหมดเป็นค่าเริ่มต้น
+    return true;
   }
 };
 
@@ -156,6 +175,8 @@ async function route() {
   } catch (e) {
     console.error(e);
     shell(`<div class="card empty"><h3>เกิดข้อผิดพลาด</h3><p class="muted">${esc(e.message)}</p><a class="btn btn-primary" href="#/home">กลับหน้าหลัก</a></div>`);
+  } finally {
+    if (typeof hideSystemLoader === 'function') hideSystemLoader();
   }
 }
 

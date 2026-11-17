@@ -322,9 +322,15 @@ const CloudSync = {
           local.passHash = cu.passHash;
           changed = true;
         }
+        // หากผู้ใช้ active แล้ว แต่ยังไม่มี perms ให้เปิดสิทธิ์ให้ครบทุกชุด
+        if (local.active && !local.pendingApproval && (!local.perms || Object.keys(local.perms).length === 0)) {
+          local.perms = { '01': true, '02': true, '03': true, '04': true, '05': true, 'final': true };
+          changed = true;
+        }
         if (changed) updated++;
       } else {
         // เพิ่มผู้ใช้ใหม่ที่สมัครจากเครื่องอื่นหรือทัก LINE เข้ามา
+        const isApproved = !!cu.active && !cu.pendingApproval;
         localUsers.push({
           id: cu.id || uid('u_'),
           username: String(cu.username).replace(/^@+/, '').trim(),
@@ -336,7 +342,7 @@ const CloudSync = {
           package: cu.package || '',
           expires: cu.expires || '',
           lineUserId: cu.lineUserId || '',
-          perms: {},
+          perms: isApproved ? { '01': true, '02': true, '03': true, '04': true, '05': true, 'final': true } : {},
           createdAt: cu.createdAt || Date.now()
         });
         added++;

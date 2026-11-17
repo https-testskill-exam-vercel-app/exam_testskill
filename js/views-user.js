@@ -991,8 +991,15 @@ async function newAttempt(examId, options = {}) {
   const timed = !!options.timed;
   const minutes = Math.min(600, Math.max(5, options.minutes || s.finalMinutes || 60));
 
+  if (typeof showSystemLoader === 'function') {
+    showSystemLoader('กำลังจัดเตรียมชุดข้อสอบ…', 'โหลดโจทย์ สุ่มลำดับตัวเลือก และเตรียมตัวจับเวลา');
+  }
+
   const p = await Exams.build(App.user, examId, s);
-  if (!p.qids.length) return toast('ชุดนี้ยังไม่มีข้อสอบ', 'warning');
+  if (!p.qids.length) {
+    if (typeof hideSystemLoader === 'function') hideSystemLoader();
+    return toast('ชุดนี้ยังไม่มีข้อสอบ', 'warning');
+  }
   p.timed = timed;
   p.remaining = timed ? minutes * 60 : 0;
   p.totalTime = p.remaining;
