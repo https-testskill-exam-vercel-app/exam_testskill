@@ -331,8 +331,6 @@ function linkLineUserWithUsername(username, lineUserId, name = '') {
   }
   return resolvedName || cleanUser;
 }
-  return resolvedName || cleanUser;
-}
 
 function replyMainMenu(replyToken) {
   const msg = "สวัสดี 👋 ยินดีต้อนรับสู่ LINE Official ของระบบ TestSkill (By กลางฟู)\\n\\nกรุณาเลือกหัวข้อที่ต้องการรับบริการ:\\n1️⃣ ยืนยันสิทธิ์ (ขอเปิดสิทธิ์ / ต่ออายุ)\\n2️⃣ ติดต่อผู้พัฒนา (คุณภาณุวัฒน์)\\n3️⃣ แจ้งปัญหาการใช้งาน\\n4️⃣ สอบถาม อื่นๆ\\n\\n👉 พิมพ์หมายเลข 1, 2, 3 หรือ 4 หรือพิมพ์ ID ของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันที";

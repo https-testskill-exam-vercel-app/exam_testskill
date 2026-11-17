@@ -166,12 +166,22 @@ async function route() {
       case 'summary': return renderSummary(parts[1]);
       case 'admin':
         if (App.user.role !== 'admin') return go('/home');
-        if (typeof renderAdmin === 'function') {
-          return renderAdmin(parts[1] || 'users', parts[2]);
-        } else if (typeof window.renderAdmin === 'function') {
-          return window.renderAdmin(parts[1] || 'users', parts[2]);
+        let adminFn = (typeof window !== 'undefined' && typeof window.renderAdmin === 'function')
+          ? window.renderAdmin
+          : (typeof renderAdmin === 'function' ? renderAdmin : null);
+        if (!adminFn) {
+          for (let wait = 0; wait < 15; wait++) {
+            await new Promise((r) => setTimeout(r, 100));
+            adminFn = (typeof window !== 'undefined' && typeof window.renderAdmin === 'function')
+              ? window.renderAdmin
+              : (typeof renderAdmin === 'function' ? renderAdmin : null);
+            if (adminFn) break;
+          }
+        }
+        if (adminFn) {
+          return adminFn(parts[1] || 'users', parts[2]);
         } else {
-          shell('<div class="card empty"><h3>กำลังโหลดหน้าผู้ดูแลระบบ…</h3><p class="muted">หากระบบไม่แสดงผลใน 2 วินาที กรุณากดปุ่มด้านล่างเพื่อโหลดเวอร์ชันล่าสุด</p><button class="btn btn-primary" onclick="location.reload(true)">รีเฟรชหน้าเว็บ</button></div>', { active: 'admin' });
+          shell('<div class="card empty"><h3>กำลังโหลดหน้าผู้ดูแลระบบ…</h3><p class="muted">หากระบบไม่แสดงผล กรุณากดปุ่มด้านล่างเพื่อโหลดเวอร์ชันล่าสุด</p><button class="btn btn-primary" onclick="location.reload(true)">รีเฟรชหน้าเว็บ</button></div>', { active: 'admin' });
           return;
         }
       default: return go('/home');

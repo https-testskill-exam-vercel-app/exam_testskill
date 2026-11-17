@@ -259,6 +259,11 @@ function renderLogin(initialTab = 'login') {
       const f = e.target, err = $('#loginErr');
       err.classList.add('hidden');
       const enteredUsername = f.username.value.trim().replace(/^@+/, '');
+      const submitBtn = f.querySelector('button[type=submit]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      showSystemLoader('กำลังเข้าสู่ระบบ…', 'ตรวจสอบรหัสผ่านและจัดเตรียมข้อมูลผู้ใช้งาน');
+
       try {
         App.user = await Auth.login(enteredUsername, f.password.value);
         App.justLoggedIn = false; // ป้องกันป๊อปอัปเด้งกวนใจตอนล็อกอิน
@@ -268,6 +273,8 @@ function renderLogin(initialTab = 'login') {
         toast(`ยินดีต้อนรับ ${App.user.name || App.user.username}${pwTimeNotice}`, 'success', 5000);
         go('/home');
       } catch (ex) {
+        hideSystemLoader();
+        if (submitBtn) submitBtn.disabled = false;
         if (ex.message.includes('อนุมัติ') || ex.message.includes('ระงับ') || ex.message.includes('สิทธิ์') || ex.message.includes('หมดอายุ')) {
           err.innerHTML = `<div>${esc(ex.message)}</div><div style="margin-top:8px"><button type="button" class="btn btn-primary btn-xs btn-rounded" id="quickVerifyLineBtn">📱 ทักแจ้งแอดมินใน LINE ทันที</button></div>`;
           err.querySelector('#quickVerifyLineBtn')?.addEventListener('click', () => {
@@ -281,6 +288,8 @@ function renderLogin(initialTab = 'login') {
           err.textContent = ex.message;
         }
         err.classList.remove('hidden');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
       }
     };
 
@@ -310,6 +319,10 @@ function renderLogin(initialTab = 'login') {
         return;
       }
 
+      const submitBtn = f.querySelector('button[type=submit]');
+      if (submitBtn) submitBtn.disabled = true;
+      showSystemLoader('กำลังสร้างบัญชีผู้ใช้งาน…', 'บันทึกข้อมูลและส่งคำขอยืนยันสิทธิ์ขึ้น Cloud');
+
       const users = await Repo.getUsers();
       const existingIdx = users.findIndex((x) => x.username.toLowerCase() === username.toLowerCase());
 
@@ -323,6 +336,8 @@ function renderLogin(initialTab = 'login') {
 
       // ถ้าในระบบมีผู้ใช้นี้อยู่แล้ว และได้รับการอนุมัติใช้งานแล้ว (active: true) -> ห้ามสมัครซ้ำ
       if ((cloudUser && cloudUser.active) || (existingIdx >= 0 && users[existingIdx].active && !users[existingIdx].pendingApproval)) {
+        hideSystemLoader();
+        if (submitBtn) submitBtn.disabled = false;
         err.textContent = `ชื่อผู้ใช้ "${username}" มีผู้ใช้งานและเปิดสิทธิ์แล้ว หากเป็นบัญชีของคุณ กรุณาไปที่หน้าเข้าสู่ระบบ`;
         err.classList.remove('hidden');
         return;
@@ -355,6 +370,8 @@ function renderLogin(initialTab = 'login') {
 
         // ซิงค์คำขอสมัครสมาชิกขึ้นระบบ Cloud ทันที
         await CloudSync.registerRequest(newUser);
+
+        hideSystemLoader();
 
         // Show registration success screen
         $('#registerFormWrap').classList.add('hidden');
@@ -389,8 +406,12 @@ function renderLogin(initialTab = 'login') {
 
         toast('สมัครสมาชิกเรียบร้อยแล้ว! กดปุ่มแจ้งยืนยันสิทธิ์ใน LINE ได้เลย', 'success', 5000);
       } catch (ex) {
+        hideSystemLoader();
         err.textContent = ex.message;
         err.classList.remove('hidden');
+      } finally {
+        hideSystemLoader();
+        if (submitBtn) submitBtn.disabled = false;
       }
     };
   };
