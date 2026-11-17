@@ -1049,6 +1049,7 @@ async function userForm(user) {
             data.passHash = await hashPassword(u.username, pw);
             data.passwordChangedAt = Date.now();
             data.mustChangePassword = false;
+            localStorage.setItem('kf_last_pw_change_' + u.username.toLowerCase(), String(data.passwordChangedAt));
             if (typeof CloudSync !== 'undefined' && CloudSync.updatePassHash) {
               CloudSync.updatePassHash(u.username, data.passHash, data.passwordChangedAt).catch(() => {});
             }

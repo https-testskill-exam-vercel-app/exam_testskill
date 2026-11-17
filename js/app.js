@@ -46,8 +46,10 @@ const Auth = {
     // ตรวจสอบรหัสผ่าน
     if (u.passHash && u.passHash !== inputHash) {
       const err = new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-      if (u.passwordChangedAt || u.updatedAt) {
-        err.passwordChangedAt = u.passwordChangedAt || u.updatedAt;
+      const backupTime = localStorage.getItem('kf_last_pw_change_' + cleanUser.toLowerCase());
+      const changedTime = u.passwordChangedAt || (backupTime ? Number(backupTime) : (u.updatedAt && u.updatedAt !== u.createdAt ? u.updatedAt : null));
+      if (changedTime) {
+        err.passwordChangedAt = changedTime;
       }
       throw err;
     }
@@ -63,6 +65,9 @@ const Auth = {
 
     Auth.checkAllowed(u);
     await Repo.updateUser(u.id, { lastLogin: Date.now() });
+    if (u.passwordChangedAt) {
+      localStorage.setItem('kf_last_pw_change_' + cleanUser.toLowerCase(), String(u.passwordChangedAt));
+    }
     localStorage.setItem('kf-session', JSON.stringify({ uid: u.id, at: Date.now() }));
     return u;
   },
@@ -482,6 +487,7 @@ async function changePasswordDialog(force = false) {
         App.user.passHash = newHash;
         App.user.passwordChangedAt = now;
         App.user.updatedAt = now;
+        localStorage.setItem('kf_last_pw_change_' + u.username.toLowerCase(), String(now));
 
         // ซิงค์รหัสผ่านใหม่ขึ้น Cloud ทันที เพื่อให้มีผลทุกอุปกรณ์
         if (typeof CloudSync !== 'undefined' && CloudSync.updatePassHash) {
