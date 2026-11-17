@@ -45,7 +45,11 @@ const Auth = {
 
     // ตรวจสอบรหัสผ่าน
     if (u.passHash && u.passHash !== inputHash) {
-      throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      const err = new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      if (u.passwordChangedAt || u.updatedAt) {
+        err.passwordChangedAt = u.passwordChangedAt || u.updatedAt;
+      }
+      throw err;
     }
 
     // กรณีผู้ใช้เดิมที่ไม่มี passHash ใน cloud หรือเครื่องใหม่ ให้บันทึก inputHash ทันที
@@ -427,26 +431,58 @@ function bindShell() {
 }
 
 async function changePasswordDialog(force = false) {
+  const currentU = await Repo.getUser(App.user.id);
+  const lastChangeText = (currentU?.passwordChangedAt || currentU?.updatedAt)
+    ? `<div class="alert alert-info small" style="margin-bottom:12px;">🔑 บัญชีนี้มีการเปลี่ยนรหัสผ่านล่าสุดเมื่อ: <b>${fmtDate(currentU.passwordChangedAt || currentU.updatedAt)}</b></div>`
+    : '';
+
   const res = await modal({
     title: force ? 'กรุณาตั้งรหัสผ่านใหม่' : 'เปลี่ยนรหัสผ่าน',
     dismissible: !force,
     body: `${force ? '<p class="alert alert-warning">คุณกำลังใช้รหัสผ่านเริ่มต้น เพื่อความปลอดภัยกรุณาเปลี่ยนรหัสผ่าน</p>' : ''}
+      ${lastChangeText}
       <label class="field"><span>รหัสผ่านเดิม</span><input class="input" type="password" name="old"></label>
       <label class="field"><span>รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)</span><input class="input" type="password" name="n1"></label>
       <label class="field"><span>ยืนยันรหัสผ่านใหม่</span><input class="input" type="password" name="n2"></label>`,
     actions: [...(force ? [] : [{ label: 'ยกเลิก', value: null }]), {
-      label: 'บันทึก', cls: 'btn-primary', onClick: async (b) => {
+      label: 'บันทึกรหัสผ่านใหม่', cls: 'btn-primary', onClick: async (b) => {
         const old = b.querySelector('[name=old]').value, n1 = b.querySelector('[name=n1]').value, n2 = b.querySelector('[name=n2]').value;
         const u = await Repo.getUser(App.user.id);
-        if (u.passHash !== (await hashPassword(u.username, old))) { toast('รหัสผ่านเดิมไม่ถูกต้อง', 'error'); return false; }
-        if (n1.length < 6) { toast('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร', 'error'); return false; }
-        if (n1 !== n2) { toast('ยืนยันรหัสผ่านไม่ตรงกัน', 'error'); return false; }
-        await Repo.updateUser(u.id, { passHash: await hashPassword(u.username, n1), mustChangePassword: false });
+        if (u.passHash && u.passHash !== (await hashPassword(u.username, old))) {
+          toast('รหัสผ่านเดิมไม่ถูกต้อง', 'error');
+          return false;
+        }
+        if (n1.length < 6) {
+          toast('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร', 'error');
+          return false;
+        }
+        if (n1 !== n2) {
+          toast('ยืนยันรหัสผ่านใหม่ไม่ตรงกัน', 'error');
+          return false;
+        }
+
+        const newHash = await hashPassword(u.username, n1);
+        const now = Date.now();
+        await Repo.updateUser(u.id, {
+          passHash: newHash,
+          passwordChangedAt: now,
+          updatedAt: now,
+          mustChangePassword: false
+        });
+        App.user.passHash = newHash;
+        App.user.passwordChangedAt = now;
+        App.user.updatedAt = now;
+
+        // ซิงค์รหัสผ่านใหม่ขึ้น Cloud ทันที เพื่อให้มีผลทุกอุปกรณ์
+        if (typeof CloudSync !== 'undefined' && CloudSync.updatePassHash) {
+          await CloudSync.updatePassHash(u.username, newHash, now);
+        }
+
+        toast(`เปลี่ยนรหัสผ่านสำเร็จ! บันทึกรหัสใหม่เข้าระบบเรียบร้อย (${fmtDate(now)})`, 'success', 4500);
         return true;
       }
     }]
   });
-  if (res) toast('เปลี่ยนรหัสผ่านเรียบร้อย', 'success');
 }
 
 /* ===== Boot ===== */

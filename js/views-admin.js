@@ -87,6 +87,13 @@ function doGet(e) {
         username: (e.parameter.username || '').trim()
       });
     }
+    if (action === 'update_pass_hash') {
+      return handleWebApiAction({
+        action: 'update_pass_hash',
+        username: (e.parameter.username || '').trim(),
+        passHash: (e.parameter.passHash || '').trim()
+      });
+    }
     if (action === 'get_user') {
       const reqUser = (e && e.parameter && e.parameter.username ? String(e.parameter.username).replace(/^@+/, '').trim().toLowerCase() : '');
       if (!reqUser) return jsonResponse({ status: 'error', message: 'username required' });
@@ -1040,7 +1047,14 @@ async function userForm(user) {
           users.push({ id: uid('u_'), username, ...data, passHash: await hashPassword(username, pw), mustChangePassword: false, createdAt: Date.now(), lastLogin: null });
           await Repo.saveUsers(users);
         } else {
-          if (pw) { data.passHash = await hashPassword(u.username, pw); data.mustChangePassword = false; }
+          if (pw) {
+            data.passHash = await hashPassword(u.username, pw);
+            data.passwordChangedAt = Date.now();
+            data.mustChangePassword = false;
+            if (typeof CloudSync !== 'undefined' && CloudSync.updatePassHash) {
+              CloudSync.updatePassHash(u.username, data.passHash, data.passwordChangedAt).catch(() => {});
+            }
+          }
           await Repo.updateUser(u.id, data);
         }
         return true;

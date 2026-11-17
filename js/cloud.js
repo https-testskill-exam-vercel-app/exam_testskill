@@ -63,20 +63,27 @@ const CloudSync = {
   /**
    * อัปเดต passHash ข้ามเครื่องขึ้น Cloud
    */
-  async updatePassHash(username, passHash) {
+  async updatePassHash(username, passHash, changedAt = Date.now()) {
     const url = this.getGasUrl();
     if (!url || !username || !passHash) return false;
+    const cleanUser = String(username).replace(/^@+/, '').trim();
     try {
-      await fetch(url, {
+      // 1. ส่งแบบ POST (text/plain หลบ CORS)
+      fetch(url, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: 'update_pass_hash',
-          username,
-          passHash
+          username: cleanUser,
+          passHash,
+          passwordChangedAt: changedAt
         })
-      });
+      }).catch(() => {});
+
+      // 2. ส่งแบบ GET Fallback ทันที ป้องกัน CORS preflight บล็อก
+      const getUrl = `${url}?action=update_pass_hash&username=${encodeURIComponent(cleanUser)}&passHash=${encodeURIComponent(passHash)}&changedAt=${encodeURIComponent(changedAt)}`;
+      await fetch(getUrl, { mode: 'no-cors', cache: 'no-store' });
       return true;
     } catch (e) {
       console.warn('CloudSync.updatePassHash warning:', e);
@@ -145,14 +152,29 @@ const CloudSync = {
         local.package = cu.package || local.package;
         local.expires = cu.expires || local.expires;
         local.lineUserId = cu.lineUserId || local.lineUserId;
-        if (cu.passHash) {
+        if (cu.updatedAt) {
+          local.updatedAt = cu.updatedAt;
+        }
+
+        // ตรวจสอบ passHash อย่างปลอดภัย:
+        // 1. ถ้าสิ่งที่ผู้ใช้พิมพ์ (inputHash) ตรงกับ local.passHash แปลว่าในเครื่องเป็นรหัสผ่านใหม่
+        // ให้ยึดรหัสในเครื่องเป็นหลัก และซิงค์อัปเดตขึ้น Cloud ทันที!
+        if (local.passHash && inputHash && local.passHash === inputHash) {
+          if (cu.passHash !== local.passHash) {
+            this.updatePassHash(cleanUser, local.passHash).catch(() => {});
+          }
+        }
+        // 2. ถ้าผู้ใช้พิมพ์ตรงกับ cu.passHash จาก Cloud (เปลี่ยนรหัสจากเครื่องอื่น) ให้ยึด Cloud
+        else if (cu.passHash && inputHash && cu.passHash === inputHash) {
           local.passHash = cu.passHash;
-        } else if (local.passHash) {
-          // ท้องถิ่นมี hash แต่ cloud ยังไม่มี -> ซิงค์ขึ้น cloud
+        }
+        // 3. กรณีทั่วไป
+        else if (cu.passHash && !local.passHash) {
+          local.passHash = cu.passHash;
+        } else if (local.passHash && !cu.passHash) {
           this.updatePassHash(cleanUser, local.passHash).catch(() => {});
-        } else if (inputHash) {
-          local.passHash = inputHash;
-          this.updatePassHash(cleanUser, inputHash).catch(() => {});
+        } else if (cu.passHash && !inputHash) {
+          local.passHash = cu.passHash;
         }
         await Repo.saveUsers(localUsers);
         return local;

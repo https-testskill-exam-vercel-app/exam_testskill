@@ -121,6 +121,15 @@ function doGet(e) {
       return handleWebApiAction(payload);
     }
 
+    // อัปเดตรหัสผ่านผ่าน GET (Fallback สำหรับเบราว์เซอร์)
+    if (action === 'update_pass_hash') {
+      return handleWebApiAction({
+        action: 'update_pass_hash',
+        username: (e.parameter.username || '').trim(),
+        passHash: (e.parameter.passHash || '').trim()
+      });
+    }
+
     // ดึงข้อมูลผู้ใช้เฉพาะราย (ใช้ตอน Login ข้ามเครื่อง ตรวจสอบสิทธิ์และรหัสผ่านล่าสุด)
     if (action === 'get_user') {
       const reqUser = (e && e.parameter && e.parameter.username ? String(e.parameter.username).replace(/^@+/, '').trim().toLowerCase() : '');

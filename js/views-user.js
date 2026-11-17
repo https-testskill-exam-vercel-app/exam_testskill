@@ -262,7 +262,10 @@ function renderLogin(initialTab = 'login') {
       try {
         App.user = await Auth.login(enteredUsername, f.password.value);
         App.justLoggedIn = false; // ป้องกันป๊อปอัปเด้งกวนใจตอนล็อกอิน
-        toast(`ยินดีต้อนรับ ${App.user.name || App.user.username}`, 'success');
+        const pwTimeNotice = (App.user.passwordChangedAt || App.user.updatedAt)
+          ? ` · เปลี่ยนรหัสผ่านล่าสุด: ${fmtDate(App.user.passwordChangedAt || App.user.updatedAt)}`
+          : '';
+        toast(`ยินดีต้อนรับ ${App.user.name || App.user.username}${pwTimeNotice}`, 'success', 5000);
         go('/home');
       } catch (ex) {
         if (ex.message.includes('อนุมัติ') || ex.message.includes('ระงับ') || ex.message.includes('สิทธิ์') || ex.message.includes('หมดอายุ')) {
@@ -272,6 +275,8 @@ function renderLogin(initialTab = 'login') {
             navigator.clipboard?.writeText(msg);
             window.open(CloudSync.getLineChatUrl(msg), '_blank', 'noopener');
           });
+        } else if (ex.passwordChangedAt) {
+          err.innerHTML = `<div>${esc(ex.message)}</div><div class="small mt-xs" style="color:var(--text-sub);padding-top:6px;margin-top:6px;border-top:1px dashed rgba(239,68,68,0.25);">🔑 <b>ข้อสังเกต:</b> บัญชีนี้มีการเปลี่ยนรหัสผ่านล่าสุดเมื่อ: <b>${fmtDate(ex.passwordChangedAt)}</b><br><span class="muted">กรุณาใช้รหัสผ่านใหม่ที่ท่านได้เปลี่ยนไป</span></div>`;
         } else {
           err.textContent = ex.message;
         }
