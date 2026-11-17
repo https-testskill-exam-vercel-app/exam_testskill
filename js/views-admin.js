@@ -578,7 +578,7 @@ async function packageApprovalDialog(user, mode = 'approve') {
                     <span class="chip chip-success">✓ บันทึกแพ็กเกจ: ${esc(pkgName)}</span>
                     <span class="chip chip-muted">หมดอายุ: ${finalExpires ? new Date(finalExpires).toLocaleDateString('th-TH') : 'ใช้งานตลอดชีพ'}</span>
                   </div>
-                  <p class="muted small">ระบบได้บันทึกและส่งสัญญาณแจ้งเตือนไปยัง Cloud แล้ว หากผู้ใช้เคยทัก LINE บอทจะยิงข้อความคอนเฟิร์มเข้าแชทให้อัตโนมัติทันที</p>
+                  <p class="muted small">ระบบได้บันทึกสิทธิ์และซิงค์ข้อมูลขึ้น Cloud เรียบร้อยแล้ว แอดมินสามารถกดส่งข้อความคอนเฟิร์มเข้าแชท LINE ของผู้ใช้ หรือคัดลอกข้อความส่งทางแชทได้ทันที</p>
                   
                   <div class="field mt">
                     <span>ข้อความตอบกลับผู้ใช้:</span>
@@ -588,24 +588,25 @@ async function packageApprovalDialog(user, mode = 'approve') {
               `,
               actions: [
                 {
-                  label: '📱 เปิดแชท LINE ตอบกลับ (สำรอง)',
-                  cls: 'btn-outline',
-                  onClick: () => {
-                    navigator.clipboard?.writeText(confirmMsg);
-                    window.open(CloudSync.getLineChatUrl(confirmMsg), '_blank', 'noopener');
+                  label: '📱 ส่งเข้า LINE ผู้ใช้ (คลิกเดียว)',
+                  cls: 'btn-primary',
+                  onClick: async () => {
+                    await navigator.clipboard?.writeText(confirmMsg);
+                    toast('คัดลอกข้อความแล้ว กำลังเปิด LINE เพื่อเลือกแชทส่งให้ผู้ใช้...', 'success', 3500);
+                    window.open(CloudSync.getLineShareUrl(confirmMsg), '_blank', 'noopener');
                     return false;
                   }
                 },
                 {
                   label: '📋 คัดลอกข้อความ',
-                  cls: 'btn-ghost',
+                  cls: 'btn-outline',
                   onClick: async () => {
                     await navigator.clipboard?.writeText(confirmMsg);
-                    toast('คัดลอกข้อความตอบกลับแล้ว', 'success');
+                    toast('คัดลอกข้อความตอบกลับแล้ว วางในแชท LINE ได้ทันที', 'success');
                     return false;
                   }
                 },
-                { label: 'เสร็จสิ้น', value: true, cls: 'btn-primary' }
+                { label: 'เสร็จสิ้น', value: true, cls: 'btn-ghost' }
               ]
             });
           }, 350);

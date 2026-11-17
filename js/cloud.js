@@ -78,23 +78,39 @@ const CloudSync = {
   },
 
   /**
-   * ดึงข้อมูลผู้ใช้เฉพาะรายจาก Google Sheet
+   * ดึงข้อมูลผู้ใช้เฉพาะรายจาก Google Sheet (มี fallback ดึงจาก get_users เพื่อรองรับทุกเวอร์ชัน)
    */
   async fetchUser(username) {
+    const cleanUser = String(username || '').trim().toLowerCase();
+    if (!cleanUser) return null;
     const url = this.getGasUrl();
-    if (!url || !username) return null;
+    if (!url) return null;
+
+    // 1. ลองเรียก endpoint เฉพาะบุคคล (get_user)
     try {
-      const res = await fetch(`${url}?action=get_user&username=${encodeURIComponent(username.trim())}&t=${Date.now()}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (data && data.status === 'ok' && data.found && data.user) {
-        return data.user;
+      const res = await fetch(`${url}?action=get_user&username=${encodeURIComponent(cleanUser)}&t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.status === 'ok' && data.found && data.user) {
+          return data.user;
+        }
       }
-      return null;
     } catch (e) {
-      console.warn('CloudSync.fetchUser warning:', e);
-      return null;
+      console.warn('fetchUser get_user warning:', e);
     }
+
+    // 2. Fallback ทันที: ค้นหาจาก get_users (รองรับ Google Apps Script ทุกเวอร์ชัน)
+    try {
+      const allUsers = await this.fetchUsersFromCloud();
+      if (Array.isArray(allUsers) && allUsers.length > 0) {
+        const found = allUsers.find((u) => (u.username || '').toLowerCase() === cleanUser);
+        if (found) return found;
+      }
+    } catch (e) {
+      console.warn('fetchUser get_users fallback warning:', e);
+    }
+
+    return null;
   },
 
   /**
@@ -110,11 +126,14 @@ const CloudSync = {
     const idx = localUsers.findIndex((u) => u.username.toLowerCase() === cleanUser.toLowerCase());
 
     if (cu) {
+      const isActive = !!cu.active;
+      const isPending = !isActive && cu.pendingApproval !== false;
+
       if (idx >= 0) {
         // อัปเดตสถานะที่แอดมินเพิ่งอนุมัติจากเครื่องอื่น
         const local = localUsers[idx];
-        local.active = cu.active;
-        local.pendingApproval = cu.pendingApproval;
+        local.active = isActive;
+        local.pendingApproval = isPending;
         local.role = cu.role || local.role;
         local.package = cu.package || local.package;
         local.expires = cu.expires || local.expires;
@@ -138,8 +157,8 @@ const CloudSync = {
           name: cu.name || cu.username,
           passHash: cu.passHash || inputHash || '',
           role: cu.role || 'user',
-          active: !!cu.active,
-          pendingApproval: cu.pendingApproval !== false,
+          active: isActive,
+          pendingApproval: isPending,
           package: cu.package || '',
           expires: cu.expires || '',
           lineUserId: cu.lineUserId || '',
@@ -154,6 +173,11 @@ const CloudSync = {
         return newUser;
       }
     }
+
+    // หาก Cloud ไม่พบหรือออฟไลน์ ให้ใช้ข้อมูลที่มีในเครื่อง
+    if (idx >= 0) return localUsers[idx];
+    return null;
+  },
 
     // หาก Cloud ไม่พบหรือออฟไลน์ ให้ใช้ข้อมูลที่มีในเครื่อง
     if (idx >= 0) return localUsers[idx];
@@ -273,43 +297,49 @@ const CloudSync = {
   },
 
   /**
-   * สร้างข้อความตอบกลับคอนเฟิร์มแพ็กเกจสำเร็จรูป
+   * สร้างข้อความตอบกลับคอนเฟิร์มแพ็กเกจสำเร็จรูป (ไม่มีคำว่า ครับ/ค่ะ)
    */
   formatConfirmationMessage({ username, packageTitle, expires }) {
     const expiryText = expires
-      ? new Date(expires).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
-      : 'ใช้งานได้ตลอดชีพ (ไม่จำกัด)';
+      ? (String(expires).includes('ตลอดชีพ') ? 'ใช้งานได้ตลอดชีพ (ไม่มีวันหมดอายุ)' : new Date(expires).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }))
+      : 'ใช้งานได้ตลอดชีพ (ไม่มีวันหมดอายุ)';
     const webUrl = 'https://https-testskill-exam-vercel-app.github.io/exam_testskill/';
 
-    return `🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้คุณเรียบร้อยแล้วครับ!
+    return `🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้เรียบร้อยแล้ว
 
-👤 ไอดี: @${username}
+👤 บัญชีผู้ใช้: @${username}
 📦 แพ็กเกจ: ${packageTitle}
 📅 วันหมดอายุ: ${expiryText}
 
-🔗 เข้าสู่ระบบและทำแบบทดสอบได้ทันที:
+🔗 เข้าสู่ระบบและเริ่มทำแบบทดสอบได้ทันที:
 ${webUrl}
 
-ขอให้ตั้งใจฝึกฝนและทำคะแนนสอบได้ตามเป้าหมายครับ ✌️✨`;
+ขอให้ตั้งใจฝึกฝนและทำคะแนนได้ตามเป้าหมาย ✌️✨`;
   },
 
   /**
-   * สร้างข้อความขอยืนยันสิทธิ์สำหรับผู้ใช้ส่งหา LINE แอดมิน
+   * สร้างข้อความขอยืนยันสิทธิ์สำหรับผู้ใช้ส่งหา LINE แอดมิน (ตัดคำว่า ครับ/ค่ะ ออกตามคำขอ)
    */
   formatUserRequestMessage({ username, name }) {
-    return `ขอยืนยันสิทธิ์เข้าใช้งานระบบ TestSkill ครับ
-• ไอดี: @${username}
+    return `ขอยืนยันสิทธิ์เข้าใช้งานระบบ TestSkill
+• บัญชีผู้ใช้: @${username}
 • ชื่อ: ${name || username}
-รบกวนแอดมินช่วยคอนเฟิร์มเปิดสิทธิ์ให้ด้วยนะครับ ขอบคุณครับ 🙏`;
+รบกวนแอดมินช่วยคอนเฟิร์มเปิดสิทธิ์ให้ด้วย ขอบคุณ🙏`;
   },
 
   /**
-   * สร้างลิงก์เปิด LINE แชทพร้อมพิมพ์ข้อความให้อัตโนมัติ (คลิกเดียวส่งได้ทันที)
+   * สร้างลิงก์เปิด LINE แชทส่งข้อความหา LINE Bot
    */
   getLineChatUrl(text, lineBotId = '') {
     const targetBot = (lineBotId || this.getLineBotId()).replace(/^@/, '');
-    // ใช้ LINE URL scheme สำหรับส่งข้อความเข้าห้องแชท Official Account
     return `https://line.me/R/oaMessage/@${targetBot}/?${encodeURIComponent(text)}`;
+  },
+
+  /**
+   * สร้างลิงก์แชร์ข้อความเข้า LINE เพื่อส่งต่อให้ผู้ใช้ในแชท (ใช้สำหรับแอดมินตอบกลับผู้ใช้)
+   */
+  getLineShareUrl(text) {
+    return `https://line.me/R/share?text=${encodeURIComponent(text)}`;
   },
 
   /**

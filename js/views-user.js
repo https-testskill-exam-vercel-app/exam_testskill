@@ -153,7 +153,7 @@ function renderLogin(initialTab = 'login') {
                 <div class="reg-status-badge"><span class="chip chip-warning">⏳ อยู่ระหว่างรอผู้ดูแลระบบเปิดสิทธิ์ใช้งาน</span></div>
               </div>
               <div class="reg-next-step">
-                <p><b>✨ ขั้นตอนสุดท้าย:</b> กดปุ่มด้านล่างเพื่อแจ้งขอยืนยันสิทธิ์ใน LINE เมื่อแอดมินกดคอนเฟิร์มในระบบ จะมีข้อความแจ้งเตือนส่งกลับไปยังแชทของคุณทันทีครับ</p>
+                <p><b>✨ ขั้นตอนสุดท้าย:</b> กดปุ่มด้านล่างเพื่อแจ้งขอยืนยันสิทธิ์ใน LINE เมื่อแอดมินกดคอนเฟิร์มในระบบ จะมีข้อความแจ้งเตือนส่งกลับไปยังแชทของคุณทันที</p>
               </div>
               <div class="reg-action-buttons">
                 <button type="button" class="btn btn-primary btn-block btn-rounded" id="regSendLineBtn">
@@ -340,7 +340,7 @@ function renderLogin(initialTab = 'login') {
         $('#regSendLineBtn').onclick = () => {
           navigator.clipboard?.writeText(reqMsg);
           window.open(CloudSync.getLineChatUrl(reqMsg), '_blank', 'noopener');
-          toast('เปิด LINE ให้แล้ว กดส่งข้อความในแชทเพื่อขอยืนยันสิทธิ์ได้ทันทีครับ', 'success', 4500);
+          toast('เปิด LINE ให้แล้ว กดส่งข้อความในแชทเพื่อขอยืนยันสิทธิ์ได้ทันที', 'success', 4500);
         };
 
         $('#regCopyLineIdBtn').onclick = () => {
@@ -359,7 +359,7 @@ function renderLogin(initialTab = 'login') {
           $('#loginForm [name=password]').focus();
         };
 
-        toast('สมัครสมาชิกเรียบร้อยแล้ว! กดปุ่มแจ้งยืนยันสิทธิ์ใน LINE ได้เลยครับ', 'success', 5000);
+        toast('สมัครสมาชิกเรียบร้อยแล้ว! กดปุ่มแจ้งยืนยันสิทธิ์ใน LINE ได้เลย', 'success', 5000);
       } catch (ex) {
         err.textContent = ex.message;
         err.classList.remove('hidden');
