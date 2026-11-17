@@ -243,16 +243,22 @@ const CloudSync = {
   async deleteUser(username) {
     const url = this.getGasUrl();
     if (!url || !username) return false;
+    const cleanUser = String(username).replace(/^@+/, '').trim();
     try {
+      // 1. ส่ง POST ลบผู้ใช้ใน Google Apps Script
       await fetch(url, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: 'delete_user',
-          username: String(username).trim()
+          username: cleanUser
         })
       });
+      // 2. เรียก GET ซ้ำเพื่อความชัวร์ 100% ว่าแถวใน Google Sheet ถูกลบออกจริง
+      try {
+        await fetch(`${url}?action=delete_user&username=${encodeURIComponent(cleanUser)}&t=${Date.now()}`);
+      } catch (e2) {}
       return true;
     } catch (e) {
       console.warn('CloudSync.deleteUser warning:', e);
@@ -265,18 +271,39 @@ const CloudSync = {
    */
   async syncUsers() {
     const cloudUsers = await this.fetchUsersFromCloud();
-    if (!cloudUsers.length) return { added: 0, updated: 0 };
-    const localUsers = await Repo.getUsers();
-    const deletedUsernames = (await Repo.getDeletedUsernames()) || [];
+    const rawDeleted = (await Repo.getDeletedUsernames()) || [];
+    const deletedUsernames = rawDeleted.map((x) => String(x).replace(/^@+/, '').trim().toLowerCase());
+    let localUsers = await Repo.getUsers();
+
+    // 1. กรองผู้ใช้ที่ถูกแอดมินลบออกจาก localUsers ทันที ป้องกันรายชื่อค้าง
+    const initialLocalCount = localUsers.length;
+    localUsers = localUsers.filter((u) => {
+      const uClean = String(u.username || '').replace(/^@+/, '').trim().toLowerCase();
+      return !deletedUsernames.includes(uClean);
+    });
+    const pruned = initialLocalCount - localUsers.length;
+
+    // 2. ถ้าใน Cloud ยังมีผู้ใช้ที่อยู่ในรายการที่แอดมินลบ ให้สั่งลบออกจาก Cloud ทันที!
+    for (const delName of deletedUsernames) {
+      if (cloudUsers.some((cu) => String(cu.username || '').replace(/^@+/, '').trim().toLowerCase() === delName)) {
+        this.deleteUser(delName).catch(() => {});
+      }
+    }
+
+    if (!cloudUsers.length) {
+      if (pruned > 0) await Repo.saveUsers(localUsers);
+      return { added: 0, updated: 0, deleted: pruned };
+    }
+
     let added = 0, updated = 0;
 
     for (const cu of cloudUsers) {
       if (!cu.username) continue;
-      const cleanUser = cu.username.toLowerCase();
-      // ถ้าแอดมินลบผู้ใช้นี้ไปแล้ว ไม่ต้องดึงกลับมาอีก!
+      const cleanUser = String(cu.username).replace(/^@+/, '').trim().toLowerCase();
+      // ถ้าแอดมินลบผู้ใช้นี้ไปแล้ว ข้ามเด็ดขาด ไม่ดึงกลับมาอีก!
       if (deletedUsernames.includes(cleanUser)) continue;
 
-      const idx = localUsers.findIndex((u) => u.username.toLowerCase() === cleanUser);
+      const idx = localUsers.findIndex((u) => String(u.username || '').replace(/^@+/, '').trim().toLowerCase() === cleanUser);
       if (idx >= 0) {
         // อัปเดตข้อมูลสถานะถ้ามี
         const local = localUsers[idx];
@@ -310,7 +337,7 @@ const CloudSync = {
         // เพิ่มผู้ใช้ใหม่ที่สมัครจากเครื่องอื่น
         localUsers.push({
           id: cu.id || uid('u_'),
-          username: cu.username,
+          username: String(cu.username).replace(/^@+/, '').trim(),
           name: cu.name || cu.username,
           passHash: cu.passHash || '',
           role: cu.role || 'user',
@@ -326,10 +353,10 @@ const CloudSync = {
       }
     }
 
-    if (added > 0 || updated > 0) {
+    if (added > 0 || updated > 0 || pruned > 0) {
       await Repo.saveUsers(localUsers);
     }
-    return { added, updated, total: localUsers.length };
+    return { added, updated, deleted: pruned, total: localUsers.length };
   },
 
   /**

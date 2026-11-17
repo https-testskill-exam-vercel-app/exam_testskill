@@ -65,6 +65,12 @@ function doGet(e) {
         adminName: (e.parameter.adminName || 'ภาณุวัฒน์').trim()
       });
     }
+    if (action === 'delete_user') {
+      return handleWebApiAction({
+        action: 'delete_user',
+        username: (e.parameter.username || '').trim()
+      });
+    }
     if (action === 'get_user') {
       const reqUser = (e && e.parameter && e.parameter.username ? String(e.parameter.username).replace(/^@+/, '').trim().toLowerCase() : '');
       if (!reqUser) return jsonResponse({ status: 'error', message: 'username required' });
@@ -576,7 +582,7 @@ async function adminUsers(el) {
     await Repo.saveUsers(users.filter((x) => x.id !== u.id));
     for (const k of [...(await DB.keys(`progress:${u.id}:`)), 'history:' + u.id, 'seen:' + u.id, 'wrong:' + u.id, 'bookmark:' + u.id]) await DB.del(k);
     if (typeof CloudSync !== 'undefined' && CloudSync.deleteUser) {
-      CloudSync.deleteUser(u.username).catch(() => {});
+      await CloudSync.deleteUser(u.username);
     }
     toast('ลบผู้ใช้ทั้งในระบบและ Cloud เรียบร้อยแล้ว', 'success');
     await adminUsers(el);

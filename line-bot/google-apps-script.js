@@ -96,6 +96,15 @@ function doGet(e) {
       return handleWebApiAction(payload);
     }
 
+    // ลบผู้ใช้ผ่าน GET (Fallback สำหรับเบราว์เซอร์)
+    if (action === 'delete_user') {
+      const payload = {
+        action: 'delete_user',
+        username: (e.parameter.username || '').trim()
+      };
+      return handleWebApiAction(payload);
+    }
+
     // ดึงข้อมูลผู้ใช้เฉพาะราย (ใช้ตอน Login ข้ามเครื่อง ตรวจสอบสิทธิ์และรหัสผ่านล่าสุด)
     if (action === 'get_user') {
       const reqUser = (e && e.parameter && e.parameter.username ? String(e.parameter.username).replace(/^@+/, '').trim().toLowerCase() : '');

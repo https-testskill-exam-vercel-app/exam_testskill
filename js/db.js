@@ -180,11 +180,12 @@ const Repo = {
     return list[i];
   },
   async getDeletedUsernames() {
-    return (await DB.get('deleted_users')) || [];
+    const list = (await DB.get('deleted_users')) || [];
+    return list.map((x) => String(x).replace(/^@+/, '').trim().toLowerCase());
   },
   async markUserDeleted(username) {
     if (!username) return;
-    const clean = String(username).trim().toLowerCase();
+    const clean = String(username).replace(/^@+/, '').trim().toLowerCase();
     const list = await Repo.getDeletedUsernames();
     if (!list.includes(clean)) {
       list.push(clean);
@@ -193,7 +194,7 @@ const Repo = {
   },
   async unmarkUserDeleted(username) {
     if (!username) return;
-    const clean = String(username).trim().toLowerCase();
+    const clean = String(username).replace(/^@+/, '').trim().toLowerCase();
     const list = (await Repo.getDeletedUsernames()).filter((x) => x !== clean);
     await DB.set('deleted_users', list);
   },
