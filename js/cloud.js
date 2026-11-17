@@ -330,11 +330,11 @@ const CloudSync = {
   },
 
   /**
-   * อัปเดตข้อมูลหรือสถานะผู้ใช้ไปยัง Cloud (Google Sheet) รองรับทั้งคอมและมือถือ
+   * อัปเดตข้อมูลหรือสถานะผู้ใช้ไปยัง Cloud (Google Sheet) รองรับทั้งคอมและมือถือ พร้อมยิง LINE ผู้ใช้
    */
   async updateUser(username, updateData = {}) {
     const url = this.getGasUrl();
-    if (!url || !username) return false;
+    if (!url || !username) return { ok: false, lineSent: false, hasLineId: false };
     const cleanUser = String(username).replace(/^@+/, '').trim();
     try {
       // 1. ส่ง POST
@@ -348,7 +348,7 @@ const CloudSync = {
           ...updateData
         })
       });
-      // 2. ส่ง GET fallback สำหรับเบราว์เซอร์มือถือ
+      // 2. ส่ง GET fallback สำหรับเบราว์เซอร์มือถือและรับ lineSent
       try {
         const params = new URLSearchParams({
           action: 'update_user',
@@ -362,29 +362,78 @@ const CloudSync = {
         if (updateData.package !== undefined) params.append('package', updateData.package);
         if (updateData.expires !== undefined) params.append('expires', updateData.expires);
         if (updateData.passHash !== undefined) params.append('passHash', updateData.passHash);
-        await fetch(`${url}?${params.toString()}`);
+        if (updateData.mode !== undefined) params.append('mode', updateData.mode);
+        const res = await fetch(`${url}?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          return { ok: true, lineSent: !!data.lineSent, hasLineId: !!data.hasLineId };
+        }
       } catch (e2) {}
-      return true;
+      return { ok: true, lineSent: false, hasLineId: false };
     } catch (e) {
       console.warn('CloudSync.updateUser warning:', e);
-      return false;
+      return { ok: false, lineSent: false, hasLineId: false };
     }
   },
 
   /**
-   * สั่งเปิด/ปิดการใช้งานบัญชีไปยัง Cloud (รองรับ Apps Script ทุกเวอร์ชัน 100%)
+   * สั่งเปิด/ปิดการใช้งานบัญชีไปยัง Cloud (รองรับ Apps Script ทุกเวอร์ชัน 100% พร้อมยิงแจ้งเตือนเข้าแชท LINE)
    */
-  async updateUserStatus(username, active) {
+  async updateUserStatus(username, active, extra = {}) {
     this.recordUserAction(username, active);
     if (active) {
       return this.confirmUser({
         username,
-        name: username,
-        packageTitle: 'แพ็กเกจมาตรฐาน',
-        expires: ''
+        name: extra.name || username,
+        packageTitle: extra.package || 'แพ็กเกจมาตรฐาน',
+        expires: extra.expires || '',
+        adminName: extra.adminName || 'ภาณุวัฒน์'
       });
     }
-    return this.updateUser(username, { active: false, pendingApproval: false });
+    return this.updateUser(username, {
+      active: false,
+      pendingApproval: false,
+      name: extra.name || username,
+      mode: 'deactivate'
+    });
+  },
+
+  /**
+   * ข้อความแจ้งเตือนเมื่อแอดมินปิดสิทธิ์/ระงับบัญชี
+   */
+  formatDeactivationMessage({ username, name }) {
+    const displayName = (name || username || '').trim();
+    const nowStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    return `สวัสดี ${displayName} 👋
+⚠️ แจ้งเตือนสถานะบัญชี TestSkill
+
+👤 ID: ${username}
+📌 สถานะ: ถูกระงับการใช้งานชั่วคราว
+⏰ มีผลตั้งแต่: ${new Date().toLocaleDateString('th-TH')} เวลา ${nowStr} น.
+
+หากคุณต้องการขอเปิดใช้งานสิทธิ์ หรือมีข้อสงสัย สามารถทักแชทสอบถามแอดมินได้ตลอดเวลาครับ 🙏`;
+  },
+
+  /**
+   * ข้อความแจ้งเตือนเมื่อแอดมินแก้ไขข้อมูลผู้ใช้/เปลี่ยนรหัสผ่าน
+   */
+  formatUpdateMessage({ username, name, packageTitle, expires, active, passwordChanged }) {
+    const displayName = (name || username || '').trim();
+    const expiryText = expires
+      ? (String(expires).includes('ตลอดชีพ') ? 'ใช้งานได้ตลอดชีพ' : new Date(expires).toLocaleDateString('th-TH'))
+      : 'ใช้งานได้ตลอดชีพ';
+    const pwText = passwordChanged ? '\n🔑 แอดมินได้ตั้งรหัสผ่านใหม่ให้คุณเรียบร้อยแล้ว' : '';
+    return `สวัสดี ${displayName} 👋
+ℹ️ แอดมินได้อัปเดตข้อมูลบัญชีของคุณในระบบ TestSkill
+
+👤 ID: ${username}
+📝 ชื่อ: ${displayName}
+📦 แพ็กเกจ: ${packageTitle || 'แพ็กเกจมาตรฐาน'}
+📅 วันหมดอายุ: ${expiryText}
+📌 สถานะ: ${active ? 'เปิดใช้งานปกติ' : 'ระงับการใช้งาน'}${pwText}
+
+🔗 เข้าสู่ระบบและตรวจสอบข้อมูล:
+https://https-testskill-exam-vercel-app.github.io/exam_testskill/`;
   },
 
   /**
@@ -403,7 +452,26 @@ const CloudSync = {
     for (const cu of cloudUsers) {
       if (!cu.username) continue;
       const cleanUser = String(cu.username).replace(/^@+/, '').trim().toLowerCase();
-      cloudUserMap.set(cleanUser, cu);
+      const existing = cloudUserMap.get(cleanUser);
+      if (!existing) {
+        cloudUserMap.set(cleanUser, cu);
+      } else {
+        // แถวซ้ำใน Google Sheet: ให้แถวที่ active ชนะแถวที่ pending เสมอ ป้องกันการเด้งกลับปิด
+        const isActive = existing.active || cu.active;
+        const isPending = !isActive && (existing.pendingApproval || cu.pendingApproval);
+        cloudUserMap.set(cleanUser, {
+          ...existing,
+          ...cu,
+          active: !!isActive,
+          pendingApproval: !!isPending,
+          package: (existing.package && !existing.package.includes('à¹')) ? existing.package : (cu.package || existing.package || ''),
+          expires: existing.expires || cu.expires || '',
+          lineUserId: existing.lineUserId || cu.lineUserId || '',
+          lineName: existing.lineName || cu.lineName || '',
+          name: (cu.name && cu.name !== cu.username) ? cu.name : (existing.name || cu.name),
+          passHash: cu.passHash || existing.passHash || ''
+        });
+      }
     }
 
     // 1. อัปเดตข้อมูลผู้ใช้ที่มีอยู่เดิมในเครื่อง

@@ -179,30 +179,51 @@ function doGet(e) {
       return jsonResponse({ status: 'ok', found: false });
     }
 
-    // ดึงรายชื่อผู้ใช้ทั้งหมดจาก Google Sheet ส่งกลับหน้าเว็บ
+    // ดึงรายชื่อผู้ใช้ทั้งหมดจาก Google Sheet ส่งกลับหน้าเว็บ (ผสานแถวซ้ำป้องกันการเด้งกลับ)
     if (action === 'get_users' || action === 'list') {
       const sheet = getDatabaseSheet('Users');
       const data = sheet.getDataRange().getValues();
       if (data.length <= 1) return jsonResponse([]);
 
-      const rows = data.slice(1);
-      const users = rows.map((r) => ({
-        id: String(r[0] || ''),
-        username: String(r[1] || '').replace(/^@+/, '').trim(),
-        name: String(r[2] || ''),
-        role: String(r[3] || 'user'),
-        active: r[4] === 'active',
-        pendingApproval: r[4] === 'pending',
-        package: String(r[5] || ''),
-        expires: String(r[6] || ''),
-        lineUserId: String(r[7] || ''),
-        lineName: String(r[8] || ''),
-        createdAt: r[9] || '',
-        updatedAt: r[10] || '',
-        passHash: String(r[11] || '')
-      })).filter((u) => u.username);
+      const userMap = {};
+      for (let i = 1; i < data.length; i++) {
+        const rawUser = String(data[i][1] || '').replace(/^@+/, '').trim();
+        if (!rawUser) continue;
+        const cleanUser = rawUser.toLowerCase();
+        const rowObj = {
+          id: String(data[i][0] || ''),
+          username: rawUser,
+          name: String(data[i][2] || ''),
+          role: String(data[i][3] || 'user'),
+          active: data[i][4] === 'active',
+          pendingApproval: data[i][4] === 'pending',
+          package: String(data[i][5] || ''),
+          expires: String(data[i][6] || ''),
+          lineUserId: String(data[i][7] || ''),
+          lineName: String(data[i][8] || ''),
+          createdAt: data[i][9] || '',
+          updatedAt: data[i][10] || '',
+          passHash: String(data[i][11] || '')
+        };
 
-      return jsonResponse(users);
+        if (!userMap[cleanUser]) {
+          userMap[cleanUser] = rowObj;
+        } else {
+          // หากมีแถวซ้ำใน Sheet: ให้แถวที่ active ชนะ pending เสมอ
+          if (rowObj.active) {
+            userMap[cleanUser].active = true;
+            userMap[cleanUser].pendingApproval = false;
+          }
+          if (rowObj.package) userMap[cleanUser].package = rowObj.package;
+          if (rowObj.expires) userMap[cleanUser].expires = rowObj.expires;
+          if (rowObj.lineUserId) userMap[cleanUser].lineUserId = rowObj.lineUserId;
+          if (rowObj.lineName) userMap[cleanUser].lineName = rowObj.lineName;
+          if (rowObj.name && rowObj.name !== rowObj.username) userMap[cleanUser].name = rowObj.name;
+          if (rowObj.passHash) userMap[cleanUser].passHash = rowObj.passHash;
+        }
+      }
+
+      return jsonResponse(Object.values(userMap));
     }
 
     // Health check
@@ -307,29 +328,28 @@ ${WEB_APP_URL}#/admin/users`);
     const pkgTitle = payload.packageTitle || 'แพ็กเกจมาตรฐาน';
     const expires = payload.expires || '';
     const now = new Date();
-
-    let foundRow = -1;
     let lineUserId = '';
+    let updatedRows = 0;
 
+    // อัปเดตทุกแถวที่ชื่อผู้ใช้ตรงกัน ป้องกันแถวซ้ำตกค้าง
     for (let i = 1; i < data.length; i++) {
       const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
       if (sheetUser === cleanUserLower) {
-        foundRow = i + 1;
-        lineUserId = String(data[i][7] || '').trim();
+        const foundRow = i + 1;
+        if (!lineUserId && data[i][7]) lineUserId = String(data[i][7]).trim();
         if (!name && data[i][2]) name = String(data[i][2]).trim();
-        break;
+
+        sheet.getRange(foundRow, 2).setValue(cleanUser);
+        sheet.getRange(foundRow, 5).setValue('active');
+        sheet.getRange(foundRow, 6).setValue(pkgTitle);
+        sheet.getRange(foundRow, 7).setValue(expires || 'ตลอดชีพ');
+        sheet.getRange(foundRow, 11).setValue(now);
+        if (name) sheet.getRange(foundRow, 3).setValue(name);
+        updatedRows++;
       }
     }
 
-    if (foundRow > 0) {
-      sheet.getRange(foundRow, 2).setValue(cleanUser); // เอา @ ออกถ้ามี
-      sheet.getRange(foundRow, 5).setValue('active');
-      sheet.getRange(foundRow, 6).setValue(pkgTitle);
-      sheet.getRange(foundRow, 7).setValue(expires || 'ตลอดชีพ');
-      sheet.getRange(foundRow, 11).setValue(now);
-      if (name) sheet.getRange(foundRow, 3).setValue(name);
-    } else {
-      // หากไม่มีแถวเดิมใน Sheet ให้เพิ่มแถวใหม่พร้อมสถานะ active ทันที
+    if (updatedRows === 0) {
       sheet.appendRow([
         'u_' + Date.now(),
         cleanUser,
@@ -378,16 +398,23 @@ ${WEB_APP_URL}
     });
   }
 
-  // 4. อัปเดตข้อมูลหรือสถานะผู้ใช้ทั่วไป (เปิด/ระงับ/แก้ไขสิทธิ์/แพ็กเกจ)
+  // 4. อัปเดตข้อมูลหรือสถานะผู้ใช้ทั่วไป (เปิด/ระงับ/แก้ไขสิทธิ์/แพ็กเกจ) พร้อมส่งเข้า LINE ผู้ใช้ทุกสถานะ
   if (action === 'update_user' || action === 'update_status') {
     const rawUsername = (payload.username || '').trim();
     const cleanUser = rawUsername.replace(/^@+/, '').trim();
     const cleanUserLower = cleanUser.toLowerCase();
     if (!cleanUser) return jsonResponse({ status: 'error', message: 'Missing username' });
+    let lineUserId = '';
+    let foundName = '';
+    let updatedRows = 0;
+
     for (let i = 1; i < data.length; i++) {
       const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
       if (sheetUser === cleanUserLower) {
         const foundRow = i + 1;
+        if (!lineUserId && data[i][7]) lineUserId = String(data[i][7]).trim();
+        if (!foundName && data[i][2]) foundName = String(data[i][2]).trim();
+
         if (payload.name !== undefined && payload.name !== '') sheet.getRange(foundRow, 3).setValue(payload.name);
         if (payload.role !== undefined && payload.role !== '') sheet.getRange(foundRow, 4).setValue(payload.role);
         if (payload.active !== undefined) {
@@ -398,10 +425,69 @@ ${WEB_APP_URL}
         if (payload.expires !== undefined) sheet.getRange(foundRow, 7).setValue(payload.expires);
         if (payload.passHash) sheet.getRange(foundRow, 12).setValue(payload.passHash);
         sheet.getRange(foundRow, 11).setValue(new Date());
-        return jsonResponse({ status: 'ok', updated: true, username: cleanUser });
+        updatedRows++;
       }
     }
-    return jsonResponse({ status: 'ok', found: false });
+
+    // ยิงข้อความแจ้งเตือนเข้าแชท LINE ของผู้ใช้ ทุกครั้งที่มีการแก้ไข/ปิดสถานะ
+    let lineSent = false;
+    if (lineUserId) {
+      const displayName = payload.name || foundName || cleanUser;
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm');
+      let msg = '';
+
+      if (payload.active === false) {
+        // กรณี: แอดมินปิดสิทธิ์ / ระงับบัญชี
+        msg =
+`สวัสดี ${displayName} 👋
+⚠️ แจ้งเตือนสถานะบัญชี TestSkill
+
+👤 ID: ${cleanUser}
+📌 สถานะ: ถูกระงับการใช้งานชั่วคราว
+⏰ มีผลตั้งแต่: ${nowStr} น.
+
+หากคุณต้องการขอเปิดใช้งานสิทธิ์ หรือมีข้อสงสัย สามารถทักแชทสอบถามแอดมินได้ตลอดเวลาครับ 🙏`;
+      } else if (payload.mode === 'renew') {
+        // กรณี: แอดมินต่ออายุการใช้งาน
+        const expDisplay = payload.expires ? (String(payload.expires).includes('ตลอดชีพ') ? 'ใช้งานได้ตลอดชีพ' : payload.expires) : 'ตลอดชีพ';
+        msg =
+`สวัสดี ${displayName} 👋
+⏱️ มีการต่ออายุการใช้งานบัญชีของคุณเรียบร้อยแล้ว!
+
+👤 ID: ${cleanUser}
+📦 แพ็กเกจ: ${payload.package || 'แพ็กเกจมาตรฐาน'}
+📅 วันหมดอายุใหม่: ${expDisplay}
+
+🔗 เข้าสู่ระบบและทำแบบทดสอบต่อได้ทันที:
+${WEB_APP_URL}`;
+      } else if (payload.mode === 'deactivate') {
+        msg =
+`สวัสดี ${displayName} 👋
+⚠️ แจ้งเตือน: บัญชี TestSkill ของคุณ (ID: ${cleanUser}) ถูกระงับการใช้งานชั่วคราว
+
+หากต้องการขอเปิดสิทธิ์หรือสอบถามข้อมูล ติดต่อแอดมินได้ตลอดเวลาครับ 🙏`;
+      } else {
+        // กรณี: แอดมินแก้ไขข้อมูลทั่วไป
+        const expDisplay = payload.expires ? (String(payload.expires).includes('ตลอดชีพ') ? 'ใช้งานได้ตลอดชีพ' : payload.expires) : 'ตลอดชีพ';
+        const pwNote = payload.passHash ? '\n🔑 แอดมินได้ตั้งรหัสผ่านใหม่ให้คุณเรียบร้อยแล้ว' : '';
+        msg =
+`สวัสดี ${displayName} 👋
+ℹ️ แอดมินได้อัปเดตข้อมูลบัญชีของคุณในระบบ TestSkill
+
+👤 ID: ${cleanUser}
+📝 ชื่อ: ${displayName}
+📅 วันหมดอายุ: ${expDisplay}${pwNote}
+
+🔗 เข้าสู่ระบบและตรวจสอบข้อมูล:
+${WEB_APP_URL}`;
+      }
+
+      if (msg) {
+        lineSent = pushLineMessage(lineUserId, msg);
+      }
+    }
+
+    return jsonResponse({ status: 'ok', updated: updatedRows > 0, username: cleanUser, lineSent: lineSent, hasLineId: !!lineUserId });
   }
 
   // 5. สั่งลบผู้ใช้ออกจาก Google Sheet
@@ -409,14 +495,36 @@ ${WEB_APP_URL}
     const rawUsername = (payload.username || '').trim();
     const cleanUser = rawUsername.replace(/^@+/, '').trim().toLowerCase();
     if (!cleanUser) return jsonResponse({ status: 'error', message: 'Missing username' });
+    let lineUserId = '';
+    let name = '';
+
+    // ค้นหา lineUserId ก่อนลบ
     for (let i = 1; i < data.length; i++) {
       const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
       if (sheetUser === cleanUser) {
-        sheet.deleteRow(i + 1);
-        return jsonResponse({ status: 'ok', message: 'User deleted from cloud' });
+        if (!lineUserId && data[i][7]) lineUserId = String(data[i][7]).trim();
+        if (!name && data[i][2]) name = String(data[i][2]).trim();
       }
     }
-    return jsonResponse({ status: 'ok', message: 'User not found in cloud' });
+
+    // แจ้งเตือนเข้า LINE ผู้ใช้ก่อนลบ
+    if (lineUserId) {
+      const displayName = name || cleanUser;
+      pushLineMessage(lineUserId,
+`สวัสดี ${displayName} 👋
+🚫 แจ้งเตือน: บัญชีของคุณ (ID: ${cleanUser}) ได้ถูกนำออกจากระบบ TestSkill แล้ว
+
+หากมีข้อสงสัยหรือต้องการลงทะเบียนใหม่ สามารถติดต่อแอดมินได้ตลอดเวลาครับ 🙏`);
+    }
+
+    // ลบทุกแถวที่ตรงกัน (ลบจากล่างขึ้นบนเพื่อป้องกัน index เลื่อน)
+    for (let i = data.length - 1; i >= 1; i--) {
+      const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+      if (sheetUser === cleanUser) {
+        sheet.deleteRow(i + 1);
+      }
+    }
+    return jsonResponse({ status: 'ok', message: 'User deleted from cloud' });
   }
 
   return jsonResponse({ status: 'error', message: 'Unknown action' });

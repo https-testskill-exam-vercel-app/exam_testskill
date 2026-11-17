@@ -134,14 +134,28 @@ function doGet(e) {
       const sheet = getDatabaseSheet('Users');
       const data = sheet.getDataRange().getValues();
       if (data.length <= 1) return jsonResponse([]);
-      const rows = data.slice(1);
-      const users = rows.map((r) => ({
-        id: String(r[0] || ''), username: String(r[1] || '').replace(/^@+/, '').trim(), name: String(r[2] || ''),
-        role: String(r[3] || 'user'), active: r[4] === 'active', pendingApproval: r[4] === 'pending',
-        package: String(r[5] || ''), expires: String(r[6] || ''), lineUserId: String(r[7] || ''),
-        createdAt: r[9] || '', updatedAt: r[10] || '', passHash: String(r[11] || '')
-      })).filter((u) => u.username);
-      return jsonResponse(users);
+      const userMap = {};
+      for (let i = 1; i < data.length; i++) {
+        const rawUser = String(data[i][1] || '').replace(/^@+/, '').trim();
+        if (!rawUser) continue;
+        const cleanUser = rawUser.toLowerCase();
+        const rowObj = {
+          id: String(data[i][0] || ''), username: rawUser, name: String(data[i][2] || ''),
+          role: String(data[i][3] || 'user'), active: data[i][4] === 'active', pendingApproval: data[i][4] === 'pending',
+          package: String(data[i][5] || ''), expires: String(data[i][6] || ''), lineUserId: String(data[i][7] || ''),
+          createdAt: data[i][9] || '', updatedAt: data[i][10] || '', passHash: String(data[i][11] || '')
+        };
+        if (!userMap[cleanUser]) {
+          userMap[cleanUser] = rowObj;
+        } else {
+          if (rowObj.active) { userMap[cleanUser].active = true; userMap[cleanUser].pendingApproval = false; }
+          if (rowObj.package) userMap[cleanUser].package = rowObj.package;
+          if (rowObj.expires) userMap[cleanUser].expires = rowObj.expires;
+          if (rowObj.lineUserId) userMap[cleanUser].lineUserId = rowObj.lineUserId;
+          if (rowObj.name && rowObj.name !== rowObj.username) userMap[cleanUser].name = rowObj.name;
+        }
+      }
+      return jsonResponse(Object.values(userMap));
     }
     return jsonResponse({ status: 'ok', service: 'TestSkill Cloud & LINE Bot', time: new Date().toISOString() });
   } catch (err) {
@@ -243,9 +257,12 @@ function handleWebApiAction(payload) {
     const cleanUser = String(payload.username || '').replace(/^@+/, '').trim();
     const cleanUserLower = cleanUser.toLowerCase();
     if (!cleanUser) return jsonResponse({ status: 'error', message: 'Missing username' });
+    let lineUserId = '', foundName = '', updatedRows = 0;
     for (let i = 1; i < data.length; i++) {
       const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
       if (sheetUser === cleanUserLower) {
+        if (!lineUserId && data[i][7]) lineUserId = String(data[i][7]).trim();
+        if (!foundName && data[i][2]) foundName = String(data[i][2]).trim();
         if (payload.name !== undefined && payload.name !== '') sheet.getRange(i + 1, 3).setValue(payload.name);
         if (payload.role !== undefined && payload.role !== '') sheet.getRange(i + 1, 4).setValue(payload.role);
         if (payload.active !== undefined) {
@@ -256,23 +273,48 @@ function handleWebApiAction(payload) {
         if (payload.expires !== undefined) sheet.getRange(i + 1, 7).setValue(payload.expires);
         if (payload.passHash) sheet.getRange(i + 1, 12).setValue(payload.passHash);
         sheet.getRange(i + 1, 11).setValue(new Date());
-        return jsonResponse({ status: 'ok', updated: true });
+        updatedRows++;
       }
     }
-    return jsonResponse({ status: 'ok', found: false });
+    let lineSent = false;
+    if (lineUserId) {
+      const displayName = payload.name || foundName || cleanUser;
+      let msg = '';
+      if (payload.active === false) {
+        msg = "สวัสดี " + displayName + " 👋\\n⚠️ แจ้งเตือน: บัญชี TestSkill ของคุณถูกระงับการใช้งานชั่วคราว\\n\\n👤 ID: " + cleanUser + "\\n📌 สถานะ: ระงับการใช้งานชั่วคราว\\n\\nหากต้องการขอเปิดสิทธิ์ ติดต่อแอดมินได้ตลอดเวลาครับ 🙏";
+      } else if (payload.mode === 'renew') {
+        const expDisplay = payload.expires || 'ตลอดชีพ';
+        msg = "สวัสดี " + displayName + " 👋\\n⏱️ มีการต่ออายุการใช้งานบัญชีของคุณเรียบร้อยแล้ว!\\n\\n👤 ID: " + cleanUser + "\\n📦 แพ็กเกจ: " + (payload.package || 'แพ็กเกจมาตรฐาน') + "\\n📅 วันหมดอายุใหม่: " + expDisplay + "\\n\\n🔗 เข้าสู่ระบบ:\\n" + WEB_APP_URL;
+      } else {
+        const expDisplay = payload.expires || 'ตลอดชีพ';
+        msg = "สวัสดี " + displayName + " 👋\\nℹ️ แอดมินได้อัปเดตข้อมูลบัญชีของคุณในระบบ TestSkill\\n\\n👤 ID: " + cleanUser + "\\n📝 ชื่อ: " + displayName + "\\n📅 วันหมดอายุ: " + expDisplay + "\\n\\n🔗 เข้าสู่ระบบ:\\n" + WEB_APP_URL;
+      }
+      if (msg) lineSent = pushLineMessage(lineUserId, msg);
+    }
+    return jsonResponse({ status: 'ok', updated: updatedRows > 0, lineSent: lineSent, hasLineId: !!lineUserId });
   }
 
   if (action === 'delete_user') {
     const cleanUser = String(payload.username || '').replace(/^@+/, '').trim().toLowerCase();
     if (!cleanUser) return jsonResponse({ status: 'error', message: 'Missing username' });
+    let lineUserId = '', name = '';
     for (let i = 1; i < data.length; i++) {
       const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
       if (sheetUser === cleanUser) {
-        sheet.deleteRow(i + 1);
-        return jsonResponse({ status: 'ok', message: 'User deleted from cloud' });
+        if (!lineUserId && data[i][7]) lineUserId = String(data[i][7]).trim();
+        if (!name && data[i][2]) name = String(data[i][2]).trim();
       }
     }
-    return jsonResponse({ status: 'ok', message: 'User not found in cloud' });
+    if (lineUserId) {
+      pushLineMessage(lineUserId, "สวัสดี " + (name || cleanUser) + " 👋\\n🚫 บัญชีของคุณ (ID: " + cleanUser + ") ได้ถูกนำออกจากระบบแล้ว หากมีข้อสงสัยติดต่อแอดมินได้ตลอดเวลาครับ");
+    }
+    for (let i = data.length - 1; i >= 1; i--) {
+      const sheetUser = String(data[i][1] || '').replace(/^@+/, '').trim().toLowerCase();
+      if (sheetUser === cleanUser) {
+        sheet.deleteRow(i + 1);
+      }
+    }
+    return jsonResponse({ status: 'ok', message: 'User deleted from cloud' });
   }
 
   return jsonResponse({ status: 'error', message: 'Unknown action' });
@@ -791,7 +833,13 @@ async function adminUsers(el, skipInitialSync = false) {
     await Repo.updateUser(c.dataset.toggle, updateData);
     if (typeof CloudSync !== 'undefined') {
       CloudSync.recordUserAction(target.username, c.checked);
-      CloudSync.updateUserStatus(target.username, c.checked).catch(console.warn);
+      CloudSync.updateUserStatus(target.username, c.checked, { name: target.name, package: target.package, expires: target.expires }).then((res) => {
+        if (res && res.lineSent) {
+          toast(c.checked ? '✓ เปิดสิทธิ์และส่งข้อความเข้า LINE ผู้ใช้เรียบร้อยแล้ว' : '⚠️ ระงับสิทธิ์และส่งข้อความแจ้งเตือนเข้า LINE ผู้ใช้เรียบร้อยแล้ว', 'info', 4000);
+        } else if (res && !res.hasLineId) {
+          toast(c.checked ? 'เปิดใช้งานบัญชีแล้ว (ผู้ใช้ยังไม่ได้ทัก LINE บอท)' : 'ระงับบัญชีแล้ว (ผู้ใช้ยังไม่ได้ทัก LINE บอท)', 'info', 3500);
+        }
+      }).catch(console.warn);
     }
     toast(c.checked ? 'เปิดใช้งานบัญชีและอนุญาตทุกชุดข้อสอบแล้ว' : 'ระงับบัญชีแล้ว', 'success');
     await adminUsers(el, true);
@@ -823,7 +871,7 @@ async function adminUsers(el, skipInitialSync = false) {
       await CloudSync.deleteUser(u.username);
     }
     toast('ลบผู้ใช้ทั้งในระบบและ Cloud เรียบร้อยแล้ว', 'success');
-    await adminUsers(el);
+    await adminUsers(el, true);
   }));
   $$('[data-hist]').forEach((b) => (b.onclick = async () => {
     const u = users.find((x) => x.id === b.dataset.hist);
@@ -1206,7 +1254,10 @@ async function userForm(user) {
           }
           await Repo.updateUser(u.id, data);
           if (typeof CloudSync !== 'undefined' && CloudSync.updateUser) {
-            CloudSync.updateUser(u.username, data).catch(console.warn);
+            CloudSync.recordUserAction(u.username, data.active);
+            CloudSync.updateUser(u.username, { ...data, mode: 'edit', passHash: data.passHash }).then((r) => {
+              if (r && r.lineSent) toast('✓ ส่งข้อความแจ้งอัปเดตข้อมูลเข้า LINE ผู้ใช้เรียบร้อยแล้ว', 'info', 3500);
+            }).catch(console.warn);
           }
         }
         return true;
