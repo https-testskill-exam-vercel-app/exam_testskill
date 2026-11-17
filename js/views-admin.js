@@ -259,6 +259,13 @@ function handleLineTextMessage(event) {
   const lower = userText.toLowerCase();
   const lineUserId = (event.source && event.source.userId) || '';
 
+  // คำสั่งผูก LINE แอดมินหลัก
+  if (lower === 'แอดมิน' || lower === 'admin' || lower === 'ลงทะเบียนแอดมิน' || lower === 'iamadmin' || lower === 'myid') {
+    setAdminLineUserId(lineUserId);
+    const replyText = "🛡️ [เชื่อมต่อ LINE แอดมินหลักสำเร็จ!]\\n\\nสวัสดีคุณภาณุวัฒน์ 👋\\nระบบได้ผูกบัญชี LINE นี้เป็น [ผู้ดูแลระบบหลัก] เรียบร้อยแล้ว!\\n(User ID: " + lineUserId + ")\\n\\n🔔 ต่อจากนี้เมื่อมี:\\n• สมาชิกสมัครใหม่ผ่านหน้าเว็บ\\n• ผู้ใช้ส่งคำขอเปิดสิทธิ์ / ต่ออายุ\\n• ผู้ใช้แจ้งปัญหาการใช้งาน\\n• ข้อความสอบถามอื่นๆ\\n\\nระบบจะส่งข้อความแจ้งเตือนเด้งเข้าแชทนี้ทันทีตลอด 24 ชั่วโมงครับ ✨";
+    return sendLineReply(replyToken, [{ type: 'text', text: replyText }]);
+  }
+
   const lineProfile = getLineUserProfile(lineUserId);
   const realLineName = lineProfile && lineProfile.displayName ? lineProfile.displayName.trim() : '';
 
@@ -279,6 +286,9 @@ function handleLineTextMessage(event) {
     const resolvedName = linkLineUserWithUsername(extractedUser, lineUserId, finalName);
     const displayName = resolvedName || finalName || extractedUser;
     const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดีคุณ " + displayName + " 👋\\nระบบได้บันทึกคำขอและเชื่อมต่อบัญชี LINE กับไอดี " + extractedUser + " เข้าหน้าจัดการของแอดมินเรียบร้อยแล้ว!\\n\\n⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) ยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊";
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin("🔑 [แจ้งเตือน: มีคำขอเปิดสิทธิ์ใช้งาน]\\n👤 ไอดี: @" + extractedUser + "\\n📱 ชื่อ LINE: " + displayName + "\\n👉 จัดการสิทธิ์ได้ที่: " + WEB_APP_URL + "#/admin/users");
+    }
     return sendLineReply(replyToken, [{ type: 'text', text: replyText, quickReply: getQuickReplyMenu() }]);
   }
 
@@ -287,14 +297,29 @@ function handleLineTextMessage(event) {
     const resolvedName = linkLineUserWithUsername(autoUsername, lineUserId, finalName);
     const displayName = resolvedName || finalName || autoUsername;
     const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดีคุณ " + displayName + " 👋\\nระบบได้รับคำขอยืนยันสิทธิ์ของคุณ และส่งตรงเข้าหน้าจัดการของแอดมิน (คุณภาณุวัฒน์) เรียบร้อยแล้ว!\\n\\n📝 ไอดีของคุณในระบบคือ: " + autoUsername + "\\n(หรือหากท่านสมัครไอดีไว้ในเว็บแล้ว สามารถพิมพ์แจ้งไอดี เช่น \\"ID: Banana009\\" ในแชทนี้เพื่อเชื่อมต่อไอดีได้เลยครับ)\\n\\n⏳ สถานะ: รอแอดมินตรวจสอบและยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนอัตโนมัติกลับมายังแชทนี้ทันที 😊";
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin("🔑 [แจ้งเตือน: มีคำขอยืนยันสิทธิ์ใหม่]\\n👤 ไอดีชั่วคราว: @" + autoUsername + "\\n📱 ชื่อ LINE: " + displayName + "\\n👉 จัดการสิทธิ์ได้ที่: " + WEB_APP_URL + "#/admin/users");
+    }
     return sendLineReply(replyToken, [{ type: 'text', text: replyText, quickReply: getQuickReplyMenu() }]);
   } else if (lower.startsWith('2') || lower.includes('ผู้พัฒนา') || lower.includes('ติดต่อ')) {
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin("👨‍💻 [แจ้งเตือน: มีผู้ใช้ติดต่อผู้พัฒนา]\\n📱 จาก: " + (displayName || lineUserId) + "\\n💬 ข้อความ:\\n\\"" + userText + "\\"");
+    }
     sendLineReply(replyToken, [{ type: 'text', text: "👨‍💻 [2. ติดต่อผู้พัฒนาระบบ TestSkill]\\n\\nคุณกำลังติดต่อผู้สร้างและพัฒนาระบบโดยตรง:\\n• ผู้พัฒนา: คุณภาณุวัฒน์ (แอดมิน)\\n• Line ID ส่วนตัว: Panuwat_99999\\n• ระบบสอบออนไลน์เตรียมความพร้อมใบประกอบวิชาชีพครู By กลางฟู\\n\\nท่านสามารถพิมพ์ข้อความ ข้อเสนอแนะ หรือคำถามทิ้งไว้ในแชทนี้ได้เลย แอดมินจะรีบเข้ามาตอบกลับโดยเร็วที่สุด 😊", quickReply: getQuickReplyMenu() }]);
   } else if (lower.startsWith('3') || lower.includes('ปัญหา') || lower.includes('บั๊ก') || lower.includes('bug')) {
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin("🛠️ [แจ้งเตือน: มีผู้ใช้แจ้งปัญหาการใช้งาน]\\n📱 จาก: " + (displayName || lineUserId) + "\\n💬 ข้อความ:\\n\\"" + userText + "\\"");
+    }
     sendLineReply(replyToken, [{ type: 'text', text: "🛠️ [3. แจ้งปัญหาการใช้งาน / พบข้อผิดพลาด]\\n\\nขออภัยในความไม่สะดวก เพื่อความรวดเร็วในการแก้ไข กรุณาระบุข้อมูลดังนี้:\\n1. ชุดข้อสอบและข้อที่พบปัญหา (เช่น ชุดที่ 5 ข้อที่ 12)\\n2. อาการของปัญหา (เช่น เฉลยผิด, หน้าจอค้าง, บันทึกคะแนนไม่ได้)\\n3. รูปภาพหน้าจอ (Screenshot) หากสะดวกแนบมา\\n\\nทีมงานจะตรวจสอบและปรับปรุงแก้ไขระบบให้ทันที ขอบคุณ!", quickReply: getQuickReplyMenu() }]);
   } else if (lower.startsWith('4') || lower.includes('สอบถาม') || lower.includes('แพ็กเกจ') || lower.includes('ราคา')) {
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin("❓ [แจ้งเตือน: มีผู้ใช้สอบถามข้อมูล]\\n📱 จาก: " + (displayName || lineUserId) + "\\n💬 ข้อความ:\\n\\"" + userText + "\\"");
+    }
     sendLineReply(replyToken, [{ type: 'text', text: "❓ [4. สอบถามข้อมูลเพิ่มเติม TestSkill]\\n\\n📘 ระบบสอบออนไลน์ TestSkill เตรียมสอบใบประกอบวิชาชีพครู By กลางฟู\\n• คลังข้อสอบตาม Test Blueprint 5 เรื่อง (930 ข้อ)\\n• ชุดรวมเทียบเคียงข้อสอบจริง 24 ชุด (2,295 ข้อ)\\n• ระบบจับเวลา บันทึกผลสอบ เฉลยละเอียดพร้อมเกร็ดความรู้ทุกข้อ และ AI วิเคราะห์ผลสอบ\\n\\nท่านสามารถพิมพ์คำถามหรือข้อสงสัยเพิ่มเติมส่งมาในแชทนี้ได้ตลอดเวลา!", quickReply: getQuickReplyMenu() }]);
   } else {
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin("💬 [แจ้งเตือน: มีข้อความใหม่จากผู้ใช้]\\n📱 จาก: " + (displayName || lineUserId) + "\\n💬 ข้อความ:\\n\\"" + userText + "\\"");
+    }
     replyMainMenu(replyToken);
   }
 }
@@ -371,6 +396,49 @@ function pushLineMessage(toUserId, text) {
     return false;
   }
 }
+
+function getAdminLineUserId() {
+  try {
+    const prop = PropertiesService.getScriptProperties().getProperty('ADMIN_LINE_USER_ID');
+    if (prop) return prop.trim();
+  } catch (e) {}
+  try {
+    const sheet = getDatabaseSheet('Users');
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][3]).toLowerCase() === 'admin' && data[i][7]) {
+        return String(data[i][7]).trim();
+      }
+    }
+  } catch (e) {}
+  return '';
+}
+
+function setAdminLineUserId(userId) {
+  if (!userId) return;
+  const cleanId = String(userId).trim();
+  try { PropertiesService.getScriptProperties().setProperty('ADMIN_LINE_USER_ID', cleanId); } catch (e) {}
+  try {
+    const sheet = getDatabaseSheet('Users');
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][3]).toLowerCase() === 'admin') {
+        sheet.getRange(i + 1, 8).setValue(cleanId);
+        break;
+      }
+    }
+  } catch (e) {}
+}
+
+function notifyAdmin(text) {
+  if (!text) return false;
+  try {
+    const adminId = getAdminLineUserId();
+    if (adminId) return pushLineMessage(adminId, text);
+  } catch (err) {}
+  return false;
+}
+
 function testSystem() {
   const sheet = getDatabaseSheet('Users');
   return 'OK - จำนวนแถว: ' + sheet.getLastRow();
@@ -1368,6 +1436,14 @@ async function adminSettings(el) {
         <button type="button" class="btn btn-outline btn-sm" id="testGas">ทดสอบการเชื่อมต่อ Cloud</button>
       </div>
     </form>
+
+    <div class="alert alert-info small mt" style="margin-top:12px;background:rgba(37,99,235,0.08);border-left:4px solid #2563eb;padding:10px 14px;border-radius:8px;">
+      <b>📲 วิธีเปิดรับการแจ้งเตือนเข้า LINE หลักของคุณ (แอดมิน):</b><br>
+      1. เปิดแชทกับบอท <b>@430lkurz</b> ในแอป LINE หลักที่คุณใช้งานอยู่<br>
+      2. พิมพ์คำว่า <code>แอดมิน</code> หรือ <code>admin</code> ส่งให้บอท 1 ครั้ง<br>
+      3. บอทจะบันทึกบัญชี LINE ของคุณเป็น [แอดมินหลัก] ทันที<br>
+      ✨ นับจากนั้น ทุกครั้งที่มีคนสมัครสมาชิกใหม่, ขอเปิดสิทธิ์, หรือแจ้งปัญหา บอทจะส่งข้อความแจ้งเตือนเด้งเข้า LINE หลักของคุณอัตโนมัติ 24 ชม.!
+    </div>
 
     <div class="row-actions mt">
       <button type="button" class="btn btn-primary btn-sm" id="btnGasCode">

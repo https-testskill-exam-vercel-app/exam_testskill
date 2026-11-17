@@ -251,6 +251,16 @@ function handleWebApiAction(payload) {
         now,
         u.passHash || '' // Pass_Hash Col 12
       ]);
+
+      // ส่งแจ้งเตือนแอดมินเข้า LINE หลักทันที
+      notifyAdmin(
+`🔔 [แจ้งเตือน: สมาชิกใหม่สมัครในเว็บ]
+👤 ไอดี: @${cleanUser}
+📝 ชื่อ: ${u.name || cleanUser}
+⏰ เวลา: ${Utilities.formatDate(now, 'Asia/Bangkok', 'dd/MM/yyyy HH:mm')}
+
+👉 ตรวจสอบและอนุมัติสิทธิ์ได้ที่:
+${WEB_APP_URL}#/admin/users`);
     }
     return jsonResponse({ status: 'ok', message: 'User registered to cloud' });
   }
@@ -378,6 +388,26 @@ function handleLineTextMessage(event) {
   const lower = userText.toLowerCase();
   const lineUserId = (event.source && event.source.userId) || '';
 
+  // 0. คำสั่งเชื่อมต่อบัญชี LINE ของแอดมินหลัก (คุณภาณุวัฒน์)
+  if (lower === 'แอดมิน' || lower === 'admin' || lower === 'ลงทะเบียนแอดมิน' || lower === 'iamadmin' || lower === 'myid') {
+    setAdminLineUserId(lineUserId);
+    const replyText =
+`🛡️ [เชื่อมต่อ LINE แอดมินหลักสำเร็จ!]
+
+สวัสดีคุณภาณุวัฒน์ 👋
+ระบบได้ผูกบัญชี LINE นี้เป็น [ผู้ดูแลระบบหลัก] เรียบร้อยแล้ว!
+(LINE User ID: ${lineUserId})
+
+🔔 ต่อจากนี้เมื่อมี:
+• สมาชิกสมัครใหม่ผ่านหน้าเว็บ
+• ผู้ใช้ส่งคำขอเปิดสิทธิ์ / ต่ออายุ
+• ผู้ใช้แจ้งปัญหาการใช้งาน
+• ข้อความสอบถามอื่นๆ
+
+ระบบจะส่งข้อความแจ้งเตือนเด้งเข้าแชทนี้ทันทีตลอด 24 ชั่วโมงครับ ✨`;
+    return sendLineReply(replyToken, [{ type: 'text', text: replyText }]);
+  }
+
   // ดึงชื่อโปรไฟล์จริงจาก LINE Profile API
   const lineProfile = getLineUserProfile(lineUserId);
   const realLineName = lineProfile && lineProfile.displayName ? lineProfile.displayName.trim() : '';
@@ -417,6 +447,18 @@ function handleLineTextMessage(event) {
 ⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) ยืนยันสิทธิ์
 เมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊`;
 
+    // ส่งแจ้งเตือนแอดมินเข้า LINE หลักทันที
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin(
+`🔑 [แจ้งเตือน: มีคำขอเปิดสิทธิ์ใช้งาน]
+👤 ไอดี: @${extractedUser}
+📱 ชื่อ LINE: ${displayName}
+⏰ เวลา: ${Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm')}
+
+👉 จัดการสิทธิ์ได้ที่:
+${WEB_APP_URL}#/admin/users`);
+    }
+
     return sendLineReply(replyToken, [
       { type: 'text', text: replyText, quickReply: getQuickReplyMenu() }
     ]);
@@ -442,16 +484,60 @@ function handleLineTextMessage(event) {
 ⏳ สถานะ: รอแอดมินตรวจสอบและยืนยันสิทธิ์
 เมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนอัตโนมัติกลับมายังแชทนี้ทันที 😊`;
 
+    // ส่งแจ้งเตือนแอดมินเข้า LINE หลักทันที
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin(
+`🔑 [แจ้งเตือน: มีคำขอยืนยันสิทธิ์ใหม่]
+👤 ไอดีชั่วคราว: @${autoUsername}
+📱 ชื่อ LINE: ${displayName}
+⏰ เวลา: ${Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm')}
+
+👉 ตรวจสอบในหน้าจัดการ:
+${WEB_APP_URL}#/admin/users`);
+    }
+
     return sendLineReply(replyToken, [
       { type: 'text', text: replyText, quickReply: getQuickReplyMenu() }
     ]);
   } else if (lower.startsWith('2') || lower.includes('ผู้พัฒนา') || lower.includes('ติดต่อ')) {
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin(
+`👨‍💻 [แจ้งเตือน: มีผู้ใช้ติดต่อผู้พัฒนา]
+📱 จาก: ${displayName || lineUserId}
+💬 ข้อความ:
+"${userText}"
+⏰ เวลา: ${Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm')}`);
+    }
     replyDeveloper(replyToken);
   } else if (lower.startsWith('3') || lower.includes('ปัญหา') || lower.includes('บั๊ก') || lower.includes('bug')) {
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin(
+`🛠️ [แจ้งเตือน: มีผู้ใช้แจ้งปัญหาการใช้งาน]
+📱 จาก: ${displayName || lineUserId}
+💬 ข้อความ:
+"${userText}"
+⏰ เวลา: ${Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm')}`);
+    }
     replyReportIssue(replyToken);
   } else if (lower.startsWith('4') || lower.includes('สอบถาม') || lower.includes('แพ็กเกจ') || lower.includes('ราคา')) {
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin(
+`❓ [แจ้งเตือน: มีผู้ใช้สอบถามข้อมูล]
+📱 จาก: ${displayName || lineUserId}
+💬 ข้อความ:
+"${userText}"
+⏰ เวลา: ${Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm')}`);
+    }
     replyGeneral(replyToken);
   } else {
+    if (lineUserId !== getAdminLineUserId()) {
+      notifyAdmin(
+`💬 [แจ้งเตือน: มีข้อความใหม่จากผู้ใช้]
+📱 จาก: ${displayName || lineUserId}
+💬 ข้อความ:
+"${userText}"
+⏰ เวลา: ${Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm')}`);
+    }
     replyMainMenu(replyToken, userText);
   }
 }
@@ -669,6 +755,61 @@ function pushLineMessage(toUserId, text) {
     console.error('Push LINE message error:', err);
     return false;
   }
+}
+
+// ----------------------------------------------------
+// ระบบแจ้งเตือนตรงเข้า LINE แอดมินหลัก (คุณภาณุวัฒน์)
+// ----------------------------------------------------
+function getAdminLineUserId() {
+  // 1. ดึงจาก Script Properties
+  try {
+    const prop = PropertiesService.getScriptProperties().getProperty('ADMIN_LINE_USER_ID');
+    if (prop) return prop.trim();
+  } catch (e) {}
+
+  // 2. ดึงจาก Sheet Users แถวที่ Role เป็น admin
+  try {
+    const sheet = getDatabaseSheet('Users');
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][3]).toLowerCase() === 'admin' && data[i][7]) {
+        return String(data[i][7]).trim();
+      }
+    }
+  } catch (e) {}
+
+  return '';
+}
+
+function setAdminLineUserId(userId) {
+  if (!userId) return;
+  const cleanId = String(userId).trim();
+  try {
+    PropertiesService.getScriptProperties().setProperty('ADMIN_LINE_USER_ID', cleanId);
+  } catch (e) {}
+  try {
+    const sheet = getDatabaseSheet('Users');
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][3]).toLowerCase() === 'admin') {
+        sheet.getRange(i + 1, 8).setValue(cleanId);
+        break;
+      }
+    }
+  } catch (e) {}
+}
+
+function notifyAdmin(text) {
+  if (!text) return false;
+  try {
+    const adminId = getAdminLineUserId();
+    if (adminId) {
+      return pushLineMessage(adminId, text);
+    }
+  } catch (err) {
+    console.error('notifyAdmin error:', err);
+  }
+  return false;
 }
 
 // ฟังก์ชันสำหรับกด "เรียกใช้" ใน Google Apps Script Editor เพื่อขอสิทธิ์ Authorization ครั้งแรก
