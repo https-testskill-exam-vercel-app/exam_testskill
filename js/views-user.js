@@ -50,7 +50,7 @@ function renderLogin(initialTab = 'login') {
             <form id="loginForm" autocomplete="on">
               <label class="field">
                 <span>ชื่อผู้ใช้ / ไอดี</span>
-                <input class="input input-rounded" name="username" autocomplete="username" placeholder="เช่น Panuwat" required autofocus>
+                <input class="input input-rounded" name="username" autocomplete="username" placeholder="เช่น Panuwat (ไม่ต้องใส่ @ นำหน้า)" required autofocus>
               </label>
               <label class="field">
                 <span>รหัสผ่าน</span>
@@ -87,6 +87,7 @@ function renderLogin(initialTab = 'login') {
                 <ul class="register-guide-list">
                   <li>ความยาว <b>8 ตัวอักษรขึ้นไป</b> (8–32 ตัว)</li>
                   <li>ต้องเป็น <b>ตัวอักษรภาษาอังกฤษผสมตัวเลข (A-Z, a-z, 0-9)</b> ทั้งไอดีและรหัสผ่าน</li>
+                  <li><b>ไม่ต้องใส่เครื่องหมาย @ นำหน้าไอดี</b> (เช่น ตั้งเป็น KruThai2026 ได้เลย)</li>
                   <li>เมื่อสมัครเสร็จสิ้น ให้<b>ติดต่อผู้ดูแลระบบทาง LINE</b> เพื่อขออนุมัติสิทธิ์เข้าใช้งาน</li>
                 </ul>
               </div>
@@ -99,12 +100,13 @@ function renderLogin(initialTab = 'login') {
 
                 <label class="field">
                   <span>2. ตั้งชื่อผู้ใช้ / ไอดี (สำหรับล็อกอิน)</span>
-                  <input class="input input-rounded" name="regUsername" id="regUsername" placeholder="เช่น KruThai2026 (ภาษาอังกฤษผสมตัวเลข 8 ตัวขึ้นไป)" required>
+                  <input class="input input-rounded" name="regUsername" id="regUsername" placeholder="เช่น KruThai2026 (ไม่ต้องใส่ @ นำหน้า)" required>
                   <div class="cred-hints" id="userHints">
                     <span class="hint-chip" data-rule="len">8 ตัวขึ้นไป</span>
                     <span class="hint-chip" data-rule="letter">ภาษาอังกฤษ (A-Z)</span>
                     <span class="hint-chip" data-rule="digit">ตัวเลข (0-9)</span>
                   </div>
+                  <small class="muted" style="margin-top:4px;display:block;">* พิมพ์ตัวอักษรและตัวเลขตรงๆ โดย<b>ไม่ต้องพิมพ์เครื่องหมาย @</b></small>
                 </label>
 
                 <label class="field">
@@ -230,7 +232,8 @@ function renderLogin(initialTab = 'login') {
 
     // Live validation update for credentials
     const updateHints = (inputEl, containerId) => {
-      const checks = credentialChecks(inputEl.value);
+      const cleanVal = inputEl.value.replace(/^@+/, '');
+      const checks = credentialChecks(cleanVal);
       const container = document.getElementById(containerId);
       if (!container) return;
       const chips = container.querySelectorAll('.hint-chip');
@@ -238,13 +241,16 @@ function renderLogin(initialTab = 'login') {
         const rule = c.dataset.rule;
         const pass = !!checks[rule];
         c.classList.toggle('ok', pass);
-        c.classList.toggle('bad', inputEl.value.length > 0 && !pass);
+        c.classList.toggle('bad', cleanVal.length > 0 && !pass);
       });
     };
 
     const regUserInp = $('#regUsername');
     const regPassInp = $('#regPassword');
-    regUserInp.oninput = () => updateHints(regUserInp, 'userHints');
+    regUserInp.oninput = () => {
+      if (regUserInp.value.startsWith('@')) regUserInp.value = regUserInp.value.replace(/^@+/, '');
+      updateHints(regUserInp, 'userHints');
+    };
     regPassInp.oninput = () => updateHints(regPassInp, 'passHints');
 
     // Login submit
@@ -252,7 +258,7 @@ function renderLogin(initialTab = 'login') {
       e.preventDefault();
       const f = e.target, err = $('#loginErr');
       err.classList.add('hidden');
-      const enteredUsername = f.username.value.trim();
+      const enteredUsername = f.username.value.trim().replace(/^@+/, '');
       try {
         App.user = await Auth.login(enteredUsername, f.password.value);
         App.justLoggedIn = false; // ป้องกันป๊อปอัปเด้งกวนใจตอนล็อกอิน
@@ -278,13 +284,13 @@ function renderLogin(initialTab = 'login') {
       e.preventDefault();
       const f = e.target, err = $('#regErr');
       err.classList.add('hidden');
-      const username = f.regUsername.value.trim();
+      const username = f.regUsername.value.trim().replace(/^@+/, '');
       const name = f.regName.value.trim();
       const password = f.regPassword.value;
       const confirm = f.regConfirm.value;
 
       if (!isValidCredential(username)) {
-        err.textContent = `ชื่อผู้ใช้ไม่ถูกต้อง: ${CREDENTIAL_RULE_TEXT}`;
+        err.textContent = `ชื่อผู้ใช้ไม่ถูกต้อง: ${CREDENTIAL_RULE_TEXT} (ไม่ต้องใส่เครื่องหมาย @)`;
         err.classList.remove('hidden');
         return;
       }
@@ -300,10 +306,26 @@ function renderLogin(initialTab = 'login') {
       }
 
       const users = await Repo.getUsers();
-      if (users.some((x) => x.username.toLowerCase() === username.toLowerCase())) {
-        err.textContent = `ชื่อผู้ใช้ "@${username}" มีผู้ใช้งานแล้ว กรุณาเลือกชื่ออื่น`;
+      const existingIdx = users.findIndex((x) => x.username.toLowerCase() === username.toLowerCase());
+
+      // ตรวจสอบกับ Cloud เพื่อความแม่นยำ
+      let cloudUser = null;
+      try {
+        if (typeof CloudSync !== 'undefined' && CloudSync.fetchUser) {
+          cloudUser = await CloudSync.fetchUser(username);
+        }
+      } catch {}
+
+      // ถ้าในระบบมีผู้ใช้นี้อยู่แล้ว และได้รับการอนุมัติใช้งานแล้ว (active: true) -> ห้ามสมัครซ้ำ
+      if ((cloudUser && cloudUser.active) || (existingIdx >= 0 && users[existingIdx].active && !users[existingIdx].pendingApproval)) {
+        err.textContent = `ชื่อผู้ใช้ "${username}" มีผู้ใช้งานและเปิดสิทธิ์แล้ว หากเป็นบัญชีของคุณ กรุณาไปที่หน้าเข้าสู่ระบบ`;
         err.classList.remove('hidden');
         return;
+      }
+
+      // หากผู้ใช้นี้เคยมีข้อมูลเดิมแต่ยังรออนุมัติ หรือแอดมินลบไปแล้ว ให้ล้างข้อมูลเดิมเพื่อสมัครใหม่
+      if (existingIdx >= 0) {
+        users.splice(existingIdx, 1);
       }
 
       try {
@@ -332,7 +354,7 @@ function renderLogin(initialTab = 'login') {
         // Show registration success screen
         $('#registerFormWrap').classList.add('hidden');
         $('#registerSuccessWrap').classList.remove('hidden');
-        $('#newRegUsernameDisplay').textContent = '@' + username;
+        $('#newRegUsernameDisplay').textContent = username;
         const copySpan = $('#copyBtnUserDisplay');
         if (copySpan) copySpan.textContent = username;
 
