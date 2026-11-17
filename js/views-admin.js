@@ -634,7 +634,8 @@ async function packageApprovalDialog(user, mode = 'approve') {
             });
 
             modal({
-              title: `🎉 คอนเฟิร์มสิทธิ์ @${esc(user.username)} เรียบร้อย!`,
+              title: `🎉 คอนเฟิร์มสิทธิ์ ${esc(user.name || user.username)} เรียบร้อย!`,
+              wide: true,
               body: `
                 <div class="confirm-done-box">
                   <div class="confirm-done-tags" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
@@ -644,11 +645,18 @@ async function packageApprovalDialog(user, mode = 'approve') {
                   <p class="muted small">ระบบได้บันทึกสิทธิ์และซิงค์ข้อมูลขึ้น Cloud เรียบร้อยแล้ว แอดมินสามารถกดส่งข้อความคอนเฟิร์มเข้าแชท LINE ของผู้ใช้ หรือคัดลอกข้อความส่งทางแชทได้ทันที</p>
                   
                   <div class="field mt">
-                    <span>ข้อความตอบกลับผู้ใช้:</span>
-                    <textarea class="input" rows="6" readonly id="doneMsgBox" style="font-size:13px;line-height:1.5;">${esc(confirmMsg)}</textarea>
+                    <span style="font-weight:600;margin-bottom:6px;display:block;">ข้อความตอบกลับผู้ใช้ (แสดงครบทุกบรรทัด):</span>
+                    <textarea class="input" rows="12" readonly id="doneMsgBox" style="font-size:13px;line-height:1.6;width:100%;min-height:220px;height:230px;resize:vertical;padding:12px;border-radius:8px;box-sizing:border-box;font-family:inherit;">${esc(confirmMsg)}</textarea>
                   </div>
                 </div>
               `,
+              onMount: (b) => {
+                const box = b.querySelector('#doneMsgBox');
+                if (box) {
+                  box.style.height = 'auto';
+                  box.style.height = Math.max(230, box.scrollHeight + 16) + 'px';
+                }
+              },
               actions: [
                 {
                   label: '📱 ส่งเข้า LINE ผู้ใช้ (คลิกเดียว)',
