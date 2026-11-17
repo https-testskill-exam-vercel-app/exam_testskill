@@ -24,17 +24,17 @@ const CloudSync = {
    */
   async registerRequest(user) {
     const url = this.getGasUrl();
-    if (!url) return false;
+    if (!url || !user || !user.username) return false;
     try {
-      // ส่งแบบ text/plain เพื่อหลบ CORS Preflight ในเบราว์เซอร์
-      await fetch(url, {
+      // 1. ส่งแบบ POST (text/plain หลบ CORS)
+      fetch(url, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: 'register',
           user: {
-            id: user.id,
+            id: user.id || ('u_' + Date.now()),
             username: user.username,
             name: user.name || user.username,
             passHash: user.passHash || '',
@@ -45,7 +45,14 @@ const CloudSync = {
             createdAt: user.createdAt || Date.now()
           }
         })
-      });
+      }).catch(() => {});
+
+      // 2. ส่งแบบ GET Fallback ทันที ป้องกัน CORS preflight บล็อกบนเบราว์เซอร์บางรุ่น
+      const cleanUser = encodeURIComponent(String(user.username).replace(/^@+/, '').trim());
+      const cleanName = encodeURIComponent(String(user.name || user.username).trim());
+      const passHash = encodeURIComponent(String(user.passHash || '').trim());
+      const getUrl = `${url}?action=register&username=${cleanUser}&name=${cleanName}&passHash=${passHash}&id=${encodeURIComponent(user.id || '')}`;
+      await fetch(getUrl, { mode: 'no-cors', cache: 'no-store' });
       return true;
     } catch (e) {
       console.warn('CloudSync.registerRequest warning:', e);

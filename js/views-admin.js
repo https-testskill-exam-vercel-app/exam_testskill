@@ -1,5 +1,7 @@
 /* ===== Admin views ===== */
-const PERM_KEYS = [...SUBJECTS.map((s) => [s.id, `เรื่อง ${s.id}`]), ['final', 'ชุดรวม']];
+const PERM_KEYS = (typeof SUBJECTS !== 'undefined' && Array.isArray(SUBJECTS))
+  ? [...SUBJECTS.map((s) => [s.id, `เรื่อง ${s.id}`]), ['final', 'ชุดรวม']]
+  : [['01','เรื่อง 01'],['02','เรื่อง 02'],['03','เรื่อง 03'],['04','เรื่อง 04'],['05','เรื่อง 05'],['final','ชุดรวม']];
 
 const GAS_BOT_SCRIPT_TEMPLATE = `/**
  * LINE Messaging API Webhook & Cloud Backend - Google Apps Script (24/7 Serverless)
@@ -55,6 +57,20 @@ function doPost(e) {
 function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || 'ping';
+    if (action === 'register') {
+      return handleWebApiAction({
+        action: 'register',
+        user: {
+          id: (e.parameter.id || '').trim(),
+          username: (e.parameter.username || '').trim(),
+          name: (e.parameter.name || '').trim(),
+          passHash: (e.parameter.passHash || '').trim(),
+          role: 'user',
+          active: false,
+          pendingApproval: true
+        }
+      });
+    }
     if (action === 'confirm_user') {
       return handleWebApiAction({
         action: 'confirm_user',
@@ -217,15 +233,32 @@ function handleWebApiAction(payload) {
   return jsonResponse({ status: 'error', message: 'Unknown action' });
 }
 
+function getLineUserProfile(userId) {
+  if (!userId) return null;
+  try {
+    const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(userId), {
+      method: 'get',
+      headers: { Authorization: 'Bearer ' + CHANNEL_ACCESS_TOKEN },
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() === 200) return JSON.parse(res.getContentText());
+  } catch (err) {}
+  return null;
+}
+
 function handleLineTextMessage(event) {
   const replyToken = event.replyToken;
   const userText = (event.message.text || '').trim();
   const lower = userText.toLowerCase();
   const lineUserId = (event.source && event.source.userId) || '';
 
+  const lineProfile = getLineUserProfile(lineUserId);
+  const realLineName = lineProfile && lineProfile.displayName ? lineProfile.displayName.trim() : '';
+
   let extractedName = '';
   const nameMatch = userText.match(/(?:ชื่อ|name)\\s*[:=•]?\\s*([^\\n\\r•]+)/i);
   if (nameMatch && nameMatch[1]) extractedName = nameMatch[1].trim();
+  const finalName = extractedName || realLineName;
 
   let extractedUser = '';
   const userMatch = userText.match(/(?:ไอดี|id|username|user)\\s*[:=•]?\\s*@?([a-zA-Z0-9._-]+)/i) || userText.match(/@([a-zA-Z0-9._-]+)/);
@@ -236,15 +269,18 @@ function handleLineTextMessage(event) {
   }
 
   if (extractedUser) {
-    const resolvedName = linkLineUserWithUsername(extractedUser, lineUserId, extractedName);
-    const displayName = resolvedName || extractedName || extractedUser;
-    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดี " + displayName + " 👋\\nระบบได้เชื่อมต่อบัญชี LINE กับไอดี " + extractedUser + " เรียบร้อยแล้ว!\\n\\n⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) ยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊";
+    const resolvedName = linkLineUserWithUsername(extractedUser, lineUserId, finalName);
+    const displayName = resolvedName || finalName || extractedUser;
+    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดีคุณ " + displayName + " 👋\\nระบบได้บันทึกคำขอและเชื่อมต่อบัญชี LINE กับไอดี " + extractedUser + " เข้าหน้าจัดการของแอดมินเรียบร้อยแล้ว!\\n\\n⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) ยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊";
     return sendLineReply(replyToken, [{ type: 'text', text: replyText, quickReply: getQuickReplyMenu() }]);
   }
 
-  if (lower.startsWith('1') || lower.includes('ยืนยัน') || lower.includes('ขอสิทธิ์') || lower.includes('อนุมัติ') || lower.includes('ต่ออายุ')) {
-    const replyText = "🔑 [1. ขอยืนยันสิทธิ์เข้าใช้งานระบบ TestSkill]\\n\\nสวัสดี 👋 เพื่อให้ระบบส่งแจ้งเตือนกลับหาท่านได้อัตโนมัติ:\\nกรุณาพิมพ์แจ้ง \\"ID\\" ของท่านในแชทนี้ได้เลย เช่น:\\n👉 ID: KruThai2026\\n\\n(หากยังไม่ได้สมัครสมาชิก สามารถกดสมัครได้ที่เว็บ: " + WEB_APP_URL + "#/register)\\n\\nเมื่อแอดมิน (คุณภาณุวัฒน์) กดยืนยันในระบบ จะมีข้อความแจ้งเตือนอัตโนมัติส่งกลับมาที่นี่ทันที!";
-    sendLineReply(replyToken, [{ type: 'text', text: replyText, quickReply: getQuickReplyMenu() }]);
+  if (lower.startsWith('1') || lower.includes('ยืนยัน') || lower.includes('ขอสิทธิ์') || lower.includes('อนุมัติ') || lower.includes('ต่ออายุ') || lower.includes('สมัคร')) {
+    const autoUsername = 'line_' + (lineUserId ? lineUserId.slice(-6) : Date.now().toString().slice(-6));
+    const resolvedName = linkLineUserWithUsername(autoUsername, lineUserId, finalName);
+    const displayName = resolvedName || finalName || autoUsername;
+    const replyText = "🔑 [ได้รับคำขอยืนยันสิทธิ์ของ " + displayName + " แล้ว]\\n\\nสวัสดีคุณ " + displayName + " 👋\\nระบบได้รับคำขอยืนยันสิทธิ์ของคุณ และส่งตรงเข้าหน้าจัดการของแอดมิน (คุณภาณุวัฒน์) เรียบร้อยแล้ว!\\n\\n📝 ไอดีของคุณในระบบคือ: " + autoUsername + "\\n(หรือหากท่านสมัครไอดีไว้ในเว็บแล้ว สามารถพิมพ์แจ้งไอดี เช่น \\"ID: Banana009\\" ในแชทนี้เพื่อเชื่อมต่อไอดีได้เลยครับ)\\n\\n⏳ สถานะ: รอแอดมินตรวจสอบและยืนยันสิทธิ์\\nเมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนอัตโนมัติกลับมายังแชทนี้ทันที 😊";
+    return sendLineReply(replyToken, [{ type: 'text', text: replyText, quickReply: getQuickReplyMenu() }]);
   } else if (lower.startsWith('2') || lower.includes('ผู้พัฒนา') || lower.includes('ติดต่อ')) {
     sendLineReply(replyToken, [{ type: 'text', text: "👨‍💻 [2. ติดต่อผู้พัฒนาระบบ TestSkill]\\n\\nคุณกำลังติดต่อผู้สร้างและพัฒนาระบบโดยตรง:\\n• ผู้พัฒนา: คุณภาณุวัฒน์ (แอดมิน)\\n• Line ID ส่วนตัว: Panuwat_99999\\n• ระบบสอบออนไลน์เตรียมความพร้อมใบประกอบวิชาชีพครู By กลางฟู\\n\\nท่านสามารถพิมพ์ข้อความ ข้อเสนอแนะ หรือคำถามทิ้งไว้ในแชทนี้ได้เลย แอดมินจะรีบเข้ามาตอบกลับโดยเร็วที่สุด 😊", quickReply: getQuickReplyMenu() }]);
   } else if (lower.startsWith('3') || lower.includes('ปัญหา') || lower.includes('บั๊ก') || lower.includes('bug')) {
@@ -279,10 +315,15 @@ function linkLineUserWithUsername(username, lineUserId, name = '') {
     sheet.getRange(foundRow, 2).setValue(cleanUser);
     if (lineUserId) sheet.getRange(foundRow, 8).setValue(lineUserId);
     sheet.getRange(foundRow, 11).setValue(now);
-    if (name) sheet.getRange(foundRow, 3).setValue(name);
+    if (name) {
+      sheet.getRange(foundRow, 3).setValue(name);
+      sheet.getRange(foundRow, 9).setValue(name);
+    }
   } else {
-    sheet.appendRow(['u_' + Date.now(), cleanUser, resolvedName, 'user', 'pending', '', '', lineUserId || '', '', now, now, '']);
+    sheet.appendRow(['u_' + Date.now(), cleanUser, resolvedName, 'user', 'pending', '', '', lineUserId || '', name || '', now, now, '']);
   }
+  return resolvedName || cleanUser;
+}
   return resolvedName || cleanUser;
 }
 
@@ -368,6 +409,7 @@ async function renderAdmin(tab, arg) {
   shell(head + '<div id="adminBody"><div class="ai-loading"><span class="spinner"></span> กำลังโหลด…</div></div>', { active: 'admin' });
   await fn($('#adminBody'), arg);
 }
+window.renderAdmin = renderAdmin;
 
 /* ---------- Overview ---------- */
 async function adminOverview(el) {

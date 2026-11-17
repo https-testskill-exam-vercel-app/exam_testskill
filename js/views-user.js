@@ -349,7 +349,7 @@ function renderLogin(initialTab = 'login') {
         await Repo.saveUsers(users);
 
         // ซิงค์คำขอสมัครสมาชิกขึ้นระบบ Cloud ทันที
-        CloudSync.registerRequest(newUser);
+        await CloudSync.registerRequest(newUser);
 
         // Show registration success screen
         $('#registerFormWrap').classList.add('hidden');

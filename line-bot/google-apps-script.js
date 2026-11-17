@@ -83,6 +83,22 @@ function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || 'ping';
 
+    // สมัครสมาชิก / ขอยืนยันสิทธิ์ผ่าน GET (Fallback สำหรับเบราว์เซอร์)
+    if (action === 'register') {
+      return handleWebApiAction({
+        action: 'register',
+        user: {
+          id: (e.parameter.id || '').trim(),
+          username: (e.parameter.username || '').trim(),
+          name: (e.parameter.name || '').trim(),
+          passHash: (e.parameter.passHash || '').trim(),
+          role: 'user',
+          active: false,
+          pendingApproval: true
+        }
+      });
+    }
+
     // ยืนยันสิทธิ์ผ่าน GET (Fallback สำหรับเบราว์เซอร์)
     if (action === 'confirm_user') {
       const payload = {
@@ -332,11 +348,30 @@ ${WEB_APP_URL}
 // ----------------------------------------------------
 // ประมวลผลข้อความจาก LINE Chat (Messaging API)
 // ----------------------------------------------------
+function getLineUserProfile(userId) {
+  if (!userId) return null;
+  try {
+    const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(userId), {
+      method: 'get',
+      headers: { Authorization: 'Bearer ' + CHANNEL_ACCESS_TOKEN },
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() === 200) {
+      return JSON.parse(res.getContentText());
+    }
+  } catch (err) {}
+  return null;
+}
+
 function handleLineTextMessage(event) {
   const replyToken = event.replyToken;
   const userText = (event.message.text || '').trim();
   const lower = userText.toLowerCase();
   const lineUserId = (event.source && event.source.userId) || '';
+
+  // ดึงชื่อโปรไฟล์จริงจาก LINE Profile API
+  const lineProfile = getLineUserProfile(lineUserId);
+  const realLineName = lineProfile && lineProfile.displayName ? lineProfile.displayName.trim() : '';
 
   // 1. ตรวจสอบชื่อในข้อความ (เช่น • ชื่อ: สมชาย หรือ ชื่อ สมชาย)
   let extractedName = '';
@@ -344,6 +379,7 @@ function handleLineTextMessage(event) {
   if (nameMatch && nameMatch[1]) {
     extractedName = nameMatch[1].trim();
   }
+  const finalName = extractedName || realLineName;
 
   // 2. ตรวจสอบว่าในข้อความมีการระบุไอดีหรือไม่
   // รองรับทั้ง: ID: Banana009, • ID: Banana009, ไอดี Banana009, @Banana009, username: Banana009, หรือพิมพ์ Banana009 ตรงๆ
@@ -360,14 +396,14 @@ function handleLineTextMessage(event) {
 
   // หากพบไอดี -> บันทึกผูก LINE User ID และชื่อ เข้า Google Sheet ทันที!
   if (extractedUser) {
-    const resolvedName = linkLineUserWithUsername(extractedUser, lineUserId, extractedName);
-    const displayName = resolvedName || extractedName || extractedUser;
+    const resolvedName = linkLineUserWithUsername(extractedUser, lineUserId, finalName);
+    const displayName = resolvedName || finalName || extractedUser;
 
     const replyText =
 `🔑 [ได้รับคำขอยืนยันสิทธิ์ของ ${displayName} แล้ว]
 
-สวัสดี ${displayName} 👋
-ระบบได้เชื่อมต่อบัญชี LINE กับไอดี ${extractedUser} เรียบร้อยแล้ว!
+สวัสดีคุณ ${displayName} 👋
+ระบบได้บันทึกคำขอและเชื่อมต่อบัญชี LINE กับไอดี ${extractedUser} เข้าหน้าจัดการของแอดมินเรียบร้อยแล้ว!
 
 ⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) ยืนยันสิทธิ์
 เมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนมายังแชทนี้ทันที ไม่ต้องคอยเปิดดูหน้าเว็บ 😊`;
@@ -378,8 +414,28 @@ function handleLineTextMessage(event) {
   }
 
   // 3. ตรวจจับ 4 หัวข้อหลัก
-  if (lower.startsWith('1') || lower.includes('ยืนยัน') || lower.includes('ขอสิทธิ์') || lower.includes('อนุมัติ') || lower.includes('ต่ออายุ')) {
-    replyVerification(replyToken, userText);
+  // หากผู้ใช้กด 1 หรือพิมพ์ ยืนยันสิทธิ์ / ขอสิทธิ์ / สมัคร แม้ไม่ได้พิมพ์ ID มาด้วย
+  // ให้บันทึกเป็นผู้ใช้รออนุมัติ (Pending) ลง Google Sheet ให้แอดมินเห็นในระบบทันที!
+  if (lower.startsWith('1') || lower.includes('ยืนยัน') || lower.includes('ขอสิทธิ์') || lower.includes('อนุมัติ') || lower.includes('ต่ออายุ') || lower.includes('สมัคร')) {
+    const autoUsername = 'line_' + (lineUserId ? lineUserId.slice(-6) : Date.now().toString().slice(-6));
+    const resolvedName = linkLineUserWithUsername(autoUsername, lineUserId, finalName);
+    const displayName = resolvedName || finalName || autoUsername;
+
+    const replyText =
+`🔑 [ได้รับคำขอยืนยันสิทธิ์ของ ${displayName} แล้ว]
+
+สวัสดีคุณ ${displayName} 👋
+ระบบได้รับคำขอยืนยันสิทธิ์ของคุณ และส่งตรงเข้าหน้าจัดการของแอดมิน (คุณภาณุวัฒน์) เรียบร้อยแล้ว!
+
+📝 ไอดีของคุณในระบบคือ: ${autoUsername}
+(หรือหากท่านสมัครไอดีไว้ในเว็บแล้ว สามารถพิมพ์แจ้งไอดี เช่น "ID: Banana009" ในแชทนี้เพื่อเชื่อมต่อไอดีได้เลยครับ)
+
+⏳ สถานะ: รอแอดมินตรวจสอบและยืนยันสิทธิ์
+เมื่อแอดมินกดยืนยันในระบบ ระบบจะส่งข้อความแจ้งเตือนอัตโนมัติกลับมายังแชทนี้ทันที 😊`;
+
+    return sendLineReply(replyToken, [
+      { type: 'text', text: replyText, quickReply: getQuickReplyMenu() }
+    ]);
   } else if (lower.startsWith('2') || lower.includes('ผู้พัฒนา') || lower.includes('ติดต่อ')) {
     replyDeveloper(replyToken);
   } else if (lower.startsWith('3') || lower.includes('ปัญหา') || lower.includes('บั๊ก') || lower.includes('bug')) {
@@ -421,6 +477,7 @@ function linkLineUserWithUsername(username, lineUserId, name = '') {
     sheet.getRange(foundRow, 11).setValue(now);
     if (name) {
       sheet.getRange(foundRow, 3).setValue(name);
+      sheet.getRange(foundRow, 9).setValue(name);
     }
   } else {
     // ถ้ายังไม่มี username นี้ในระบบ (ทัก LINE ก่อนสมัคร) ให้เพิ่มไว้ในสถานะ pending
@@ -433,7 +490,7 @@ function linkLineUserWithUsername(username, lineUserId, name = '') {
       '',
       '',
       lineUserId || '',
-      '',
+      name || '',
       now,
       now,
       ''
