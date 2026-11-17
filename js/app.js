@@ -229,6 +229,10 @@ function shell(content, { active = '' } = {}) {
               ${u.role === 'admin' ? '<span class="chip chip-primary chip-xs">👑 ผู้ดูแลระบบ</span>' : '<span class="chip chip-xs">👤 ผู้ใช้งาน</span>'}
             </div>
           </div>
+          <button type="button" data-act="rename">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="menu-svg-icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>เปลี่ยนชื่อผู้ใช้งาน</span>
+          </button>
           <button type="button" data-act="pw">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="menu-svg-icon"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <span>เปลี่ยนรหัสผ่าน</span>
@@ -427,8 +431,86 @@ function bindShell() {
   if (!btn) return;
   btn.onclick = (e) => { e.stopPropagation(); menu.classList.toggle('open'); };
   document.onclick = () => menu.classList.remove('open');
-  menu.querySelector('[data-act=logout]').onclick = () => Auth.logout();
-  menu.querySelector('[data-act=pw]').onclick = () => changePasswordDialog();
+  const logoutBtn = menu.querySelector('[data-act=logout]');
+  if (logoutBtn) logoutBtn.onclick = () => Auth.logout();
+  const renameBtn = menu.querySelector('[data-act=rename]');
+  if (renameBtn) renameBtn.onclick = () => changeNameDialog();
+  const pwBtn = menu.querySelector('[data-act=pw]');
+  if (pwBtn) pwBtn.onclick = () => changePasswordDialog();
+}
+
+async function changeNameDialog() {
+  const u = await Repo.getUser(App.user.id);
+  if (!u) return;
+
+  await modal({
+    title: 'เปลี่ยนชื่อผู้ใช้งาน',
+    body: `
+      <div style="margin-bottom:1rem;background:var(--bg-app);padding:0.75rem 1rem;border-radius:var(--radius-sm);border:1px solid var(--border);">
+        <span class="muted small">ไอดีผู้ใช้ (Username):</span> <b style="color:var(--primary);">@${esc(u.username)}</b>
+        <span class="muted small" style="display:block;margin-top:2px;">(ไอดีสำหรับเข้าสู่ระบบจะไม่เปลี่ยนแปลง)</span>
+      </div>
+      <label class="field">
+        <span>ชื่อที่ต้องการแสดง (Display Name)</span>
+        <input class="input" type="text" name="newName" value="${esc(u.name || '')}" placeholder="ระบุชื่อ-นามสกุล หรือชื่อเรียกของคุณ" maxlength="50" autofocus>
+      </label>
+      <p class="muted small" style="margin-top:0.45rem;">
+        💡 ชื่อนี้จะแสดงในระบบ ใบสรุปคะแนน และการติดต่อประสานงานกับผู้ดูแล
+      </p>`,
+    actions: [
+      { label: 'ยกเลิก', value: null },
+      {
+        label: 'บันทึกชื่อใหม่',
+        cls: 'btn-primary',
+        onClick: async (b) => {
+          const input = b.querySelector('[name=newName]');
+          const newName = (input?.value || '').trim();
+          if (!newName) {
+            toast('กรุณาระบุชื่อที่ต้องการแสดง', 'warning');
+            input?.focus();
+            return false;
+          }
+          if (newName.length > 50) {
+            toast('ชื่อต้องมีความยาวไม่เกิน 50 ตัวอักษร', 'warning');
+            return false;
+          }
+          if (newName === (u.name || '')) {
+            toast('ชื่อไม่มีการเปลี่ยนแปลง', 'info');
+            return true;
+          }
+
+          const now = Date.now();
+          await Repo.updateUser(u.id, {
+            name: newName,
+            updatedAt: now
+          });
+
+          // อัปเดตข้อมูลผู้ใช้ในเซสชันปัจจุบัน
+          App.user.name = newName;
+          App.user.updatedAt = now;
+
+          // อัปเดตการแสดงผลบนหน้าจอทันทีทุกจุด
+          $$('.user-name').forEach((el) => (el.textContent = newName));
+          $$('.avatar').forEach((el) => (el.textContent = newName.charAt(0).toUpperCase()));
+          const dropName = $('.dropdown-user-name b');
+          if (dropName) dropName.textContent = newName;
+          const eyebrow = $('.hero-text-wrap .eyebrow');
+          if (eyebrow) {
+            const roleBadge = eyebrow.querySelector('.role-badge')?.outerHTML || '';
+            eyebrow.innerHTML = `สวัสดี, ${esc(newName)} 👋 ${roleBadge}`;
+          }
+
+          // ซิงค์ชื่อใหม่ขึ้น Google Sheets ทันที
+          if (typeof CloudSync !== 'undefined' && CloudSync.updateUser) {
+            CloudSync.updateUser(u.username, { name: newName, mode: 'rename' });
+          }
+
+          toast(`✓ บันทึกชื่อเป็น "${newName}" เรียบร้อยแล้ว`, 'success', 3500);
+          return true;
+        }
+      }
+    ]
+  });
 }
 
 async function changePasswordDialog(force = false) {

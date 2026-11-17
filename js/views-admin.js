@@ -104,7 +104,8 @@ function doGet(e) {
         pendingApproval: e.parameter.pendingApproval !== undefined ? (e.parameter.pendingApproval === 'true' || e.parameter.pendingApproval === true) : undefined,
         package: e.parameter.package,
         expires: e.parameter.expires,
-        passHash: e.parameter.passHash
+        passHash: e.parameter.passHash,
+        mode: e.parameter.mode
       });
     }
     if (action === 'get_user') {

@@ -141,7 +141,8 @@ function doGet(e) {
         pendingApproval: e.parameter.pendingApproval !== undefined ? (e.parameter.pendingApproval === 'true' || e.parameter.pendingApproval === true) : undefined,
         package: e.parameter.package,
         expires: e.parameter.expires,
-        passHash: e.parameter.passHash
+        passHash: e.parameter.passHash,
+        mode: e.parameter.mode
       };
       return handleWebApiAction(payload);
     }
@@ -466,6 +467,14 @@ ${WEB_APP_URL}`;
 ⚠️ แจ้งเตือน: บัญชี TestSkill ของคุณ (ID: ${cleanUser}) ถูกระงับการใช้งานชั่วคราว
 
 หากต้องการขอเปิดสิทธิ์หรือสอบถามข้อมูล ติดต่อแอดมินได้ตลอดเวลาครับ 🙏`;
+      } else if (payload.mode === 'rename' || payload.mode === 'self_edit') {
+        msg =
+`สวัสดี ${displayName} 👋
+✏️ คุณได้เปลี่ยนชื่อผู้ใช้งานในระบบ TestSkill เรียบร้อยแล้ว
+
+👤 ID: ${cleanUser}
+📝 ชื่อใหม่: ${displayName}
+⏰ เวลา: ${nowStr} น.`;
       } else {
         // กรณี: แอดมินแก้ไขข้อมูลทั่วไป
         const expDisplay = payload.expires ? (String(payload.expires).includes('ตลอดชีพ') ? 'ใช้งานได้ตลอดชีพ' : payload.expires) : 'ตลอดชีพ';
