@@ -292,17 +292,19 @@ const CloudSync = {
   },
 
   /**
-   * สร้างข้อความตอบกลับคอนเฟิร์มแพ็กเกจสำเร็จรูป (ไม่มีคำว่า ครับ/ค่ะ)
+   * สร้างข้อความตอบกลับคอนเฟิร์มแพ็กเกจสำเร็จรูป (สวัสดี [ชื่อผู้ใช้] และ ID ไม่มี @)
    */
-  formatConfirmationMessage({ username, packageTitle, expires }) {
+  formatConfirmationMessage({ username, name, packageTitle, expires }) {
     const expiryText = expires
       ? (String(expires).includes('ตลอดชีพ') ? 'ใช้งานได้ตลอดชีพ (ไม่มีวันหมดอายุ)' : new Date(expires).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }))
       : 'ใช้งานได้ตลอดชีพ (ไม่มีวันหมดอายุ)';
     const webUrl = 'https://https-testskill-exam-vercel-app.github.io/exam_testskill/';
+    const displayName = (name || username || '').trim();
 
-    return `🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้เรียบร้อยแล้ว
+    return `สวัสดี ${displayName} 👋
+🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้เรียบร้อยแล้ว
 
-👤 บัญชีผู้ใช้: @${username}
+👤 ID: ${username}
 📦 แพ็กเกจ: ${packageTitle}
 📅 วันหมดอายุ: ${expiryText}
 
@@ -313,12 +315,13 @@ ${webUrl}
   },
 
   /**
-   * สร้างข้อความขอยืนยันสิทธิ์สำหรับผู้ใช้ส่งหา LINE แอดมิน (ตัดคำว่า ครับ/ค่ะ ออกตามคำขอ)
+   * สร้างข้อความขอยืนยันสิทธิ์สำหรับผู้ใช้ส่งหา LINE แอดมิน (ID ไม่มี @)
    */
   formatUserRequestMessage({ username, name }) {
+    const displayName = (name || username || '').trim();
     return `ขอยืนยันสิทธิ์เข้าใช้งานระบบ TestSkill
-• บัญชีผู้ใช้: @${username}
-• ชื่อ: ${name || username}
+• ชื่อ: ${displayName}
+• ID: ${username}
 รบกวนแอดมินช่วยคอนเฟิร์มเปิดสิทธิ์ให้ด้วย ขอบคุณ🙏`;
   },
 

@@ -160,7 +160,7 @@ function renderLogin(initialTab = 'login') {
                   📱 แจ้งขอยืนยันสิทธิ์ใน LINE (คลิกเดียวส่งทันที)
                 </button>
                 <button type="button" class="btn btn-outline btn-block btn-rounded" id="regCopyLineIdBtn">
-                  📋 คัดลอกข้อความขอยืนยันสิทธิ์ (@<span id="copyBtnUserDisplay"></span>)
+                  📋 คัดลอกข้อความขอยืนยันสิทธิ์ (ID: <span id="copyBtnUserDisplay"></span>)
                 </button>
                 <button type="button" class="btn btn-ghost btn-block btn-rounded" id="regBackToLoginBtn">
                   ← ไปที่หน้าเข้าสู่ระบบ
@@ -345,7 +345,7 @@ function renderLogin(initialTab = 'login') {
 
         $('#regCopyLineIdBtn').onclick = () => {
           navigator.clipboard?.writeText(reqMsg);
-          toast(`คัดลอกข้อความขอยืนยันสิทธิ์ @${username} แล้ว`, 'success');
+          toast(`คัดลอกข้อความขอยืนยันสิทธิ์ ID: ${username} แล้ว`, 'success');
         };
 
         $('#regBackToLoginBtn').onclick = () => {

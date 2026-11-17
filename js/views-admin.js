@@ -622,6 +622,7 @@ async function packageApprovalDialog(user, mode = 'approve') {
           setTimeout(() => {
             const confirmMsg = CloudSync.formatConfirmationMessage({
               username: user.username,
+              name: user.name,
               packageTitle: pkgName,
               expires: finalExpires
             });

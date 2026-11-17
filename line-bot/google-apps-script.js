@@ -222,6 +222,7 @@ function handleWebApiAction(payload) {
   // 3. แอดมินกด "คอนเฟิร์ม" สิทธิ์และเลือกแพ็กเกจ
   if (action === 'confirm_user') {
     const username = (payload.username || '').trim();
+    let name = (payload.name || '').trim();
     const pkgTitle = payload.packageTitle || 'แพ็กเกจมาตรฐาน';
     const expires = payload.expires || '';
     const now = new Date();
@@ -233,6 +234,7 @@ function handleWebApiAction(payload) {
       if (String(data[i][1]).toLowerCase() === username.toLowerCase()) {
         foundRow = i + 1;
         lineUserId = String(data[i][7] || '').trim();
+        if (!name && data[i][2]) name = String(data[i][2]).trim();
         break;
       }
     }
@@ -248,13 +250,15 @@ function handleWebApiAction(payload) {
     let lineSent = false;
     if (lineUserId) {
       const expiryDisplay = expires
-        ? new Date(expires).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+        ? (String(expires).includes('ตลอดชีพ') ? 'ใช้งานได้ตลอดชีพ (ไม่มีวันหมดอายุ)' : new Date(expires).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }))
         : 'ใช้งานได้ตลอดชีพ (ไม่มีวันหมดอายุ)';
 
+      const displayName = (name || username || '').trim();
       const pushText =
-`🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้เรียบร้อยแล้ว
+`สวัสดี ${displayName} 👋
+🎉 แอดมินคอนเฟิร์มสิทธิ์การใช้งานให้เรียบร้อยแล้ว
 
-👤 บัญชีผู้ใช้: @${username}
+👤 ID: ${username}
 📦 แพ็กเกจ: ${pkgTitle}
 📅 วันหมดอายุ: ${expiryDisplay}
 
@@ -286,8 +290,8 @@ function handleLineTextMessage(event) {
   const lower = userText.toLowerCase();
   const lineUserId = event.source.userId || '';
 
-  // 1. ตรวจสอบว่าในข้อความมีการระบุไอดีหรือไม่ (เช่น @KruThai2026 หรือ ไอดี KruThai2026)
-  const userMatch = userText.match(/@([a-zA-Z0-9._-]+)/) || userText.match(/(?:ไอดี|username|user)\s*[:=]?\s*([a-zA-Z0-9._-]+)/i);
+  // 1. ตรวจสอบว่าในข้อความมีการระบุไอดีหรือไม่ (รองรับทั้ง ID: xxx, ไอดี xxx, หรือ @xxx)
+  const userMatch = userText.match(/(?:ไอดี|id|username|user)\s*[:=]?\s*([a-zA-Z0-9._-]+)/i) || userText.match(/@([a-zA-Z0-9._-]+)/);
 
   if (userMatch && userMatch[1]) {
     const rawUsername = userMatch[1].trim();
@@ -295,9 +299,9 @@ function handleLineTextMessage(event) {
     linkLineUserWithUsername(rawUsername, lineUserId);
 
     const replyText =
-`🔑 [ได้รับคำขอยืนยันสิทธิ์ของ @${rawUsername} แล้ว]
+`🔑 [ได้รับคำขอยืนยันสิทธิ์ของ ${rawUsername} แล้ว]
 
-สวัสดี @${rawUsername} 👋
+สวัสดี ${rawUsername} 👋
 ระบบได้เชื่อมต่อบัญชี LINE ของท่านกับไอดีในระบบเรียบร้อยแล้ว!
 
 ⏳ สถานะ: รอแอดมิน (คุณภาณุวัฒน์) คอนเฟิร์มแพ็กเกจ
@@ -365,7 +369,7 @@ function replyVerification(replyToken, text) {
 
 สวัสดี 👋 เพื่อให้ระบบส่งแจ้งเตือนกลับหาท่านได้อัตโนมัติ:
 กรุณาพิมพ์แจ้ง "ไอดี" ของท่านในแชทนี้ได้เลย เช่น:
-👉 @ไอดีของคุณ (เช่น @KruThai2026)
+👉 ID ของคุณ (เช่น KruThai2026)
 
 (หากยังไม่ได้สมัครสมาชิก สามารถกดสมัครได้ที่เว็บ: ${WEB_APP_URL}#/register)
 
@@ -434,7 +438,7 @@ function replyMainMenu(replyToken, userText) {
 3️⃣ แจ้งปัญหาการใช้งาน
 4️⃣ สอบถาม อื่นๆ
 
-👉 พิมพ์หมายเลข 1, 2, 3 หรือ 4 หรือพิมพ์ @ไอดีของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันที`;
+👉 พิมพ์หมายเลข 1, 2, 3 หรือ 4 หรือพิมพ์ ID ของคุณ เพื่อขอยืนยันสิทธิ์ได้ทันที`;
 
   sendLineReply(replyToken, [
     { type: 'text', text: msg, quickReply: getQuickReplyMenu() }
