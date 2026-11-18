@@ -27,6 +27,7 @@ async function renderQuiz(examId) {
       <div class="quiz-title"><b>${esc(title)}</b><div class="quiz-progress"><div id="progBar"></div></div><small class="muted" id="progText"></small></div>
       <div class="quiz-top-right">
         ${p.timed ? '<div class="timer" id="timer">⏱ --:--</div>' : '<div class="timer timer-free" id="timer">🧘 --:--</div>'}
+        <button class="icon-btn sound-toggle" title="${Sound.isEnabled() ? 'เปิดเสียงเอฟเฟกต์อยู่ (คลิกเพื่อปิด)' : 'ปิดเสียงเอฟเฟกต์อยู่ (คลิกเพื่อเปิด)'}" aria-label="เปิด/ปิดเสียง">${Sound.icon()}</button>
         <button class="icon-btn theme-toggle" title="สลับโหมด">${Theme.icon()}</button>
         <button class="icon-btn only-mobile" id="navToggle" title="รายการข้อ">☰</button>
       </div>
@@ -54,7 +55,7 @@ async function renderQuiz(examId) {
       const cls = [a ? (a.correct ? 'ok' : 'bad') : '', p.flags.includes(id) ? 'flag' : '', i === p.current ? 'current' : ''].join(' ');
       return `<button class="nav-cell ${cls}" data-i="${i}">${i + 1}</button>`;
     }).join('');
-    $$('#navGrid .nav-cell').forEach((b) => (b.onclick = () => { p.current = +b.dataset.i; selected = null; renderQuestion(); renderNav(); save(); $('#quizSide').classList.remove('open'); }));
+    $$('#navGrid .nav-cell').forEach((b) => (b.onclick = () => { Sound.click(); p.current = +b.dataset.i; selected = null; renderQuestion(); renderNav(); save(); $('#quizSide').classList.remove('open'); }));
     const n = answeredCount();
     $('#progBar').style.width = `${(n / p.qids.length) * 100}%`;
     $('#progText').textContent = `ตอบแล้ว ${n}/${p.qids.length} ข้อ`;
@@ -94,12 +95,12 @@ async function renderQuiz(examId) {
       </div>
       <p class="kbd-hint muted small">คีย์ลัด: 1–4 เลือกตัวเลือก · Enter ส่งคำตอบ/ข้อถัดไป · ← → เปลี่ยนข้อ</p>`;
 
-    $$('#qcard .choice').forEach((b) => (b.onclick = () => { if (ans) return; selected = +b.dataset.k; renderQuestion(); }));
+    $$('#qcard .choice').forEach((b) => (b.onclick = () => { if (ans) return; Sound.click(); selected = +b.dataset.k; renderQuestion(); }));
     const on = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
     on('submitBtn', submit);
-    on('nextBtn', () => move(1));
-    on('skipBtn', () => move(1));
-    on('prevBtn', () => move(-1));
+    on('nextBtn', () => { Sound.click(); move(1); });
+    on('skipBtn', () => { Sound.click(); move(1); });
+    on('prevBtn', () => { Sound.click(); move(-1); });
     on('endBtn', () => finish());
     on('flagBtn', () => { const i = p.flags.indexOf(qid); i >= 0 ? p.flags.splice(i, 1) : p.flags.push(qid); renderQuestion(); renderNav(); save(); });
     on('bmBtn', async () => {
@@ -123,6 +124,11 @@ async function renderQuiz(examId) {
     if (selected == null) return;
     const qid = p.qids[p.current], q = qmap[qid];
     const correct = selected === q.answer;
+    if (correct) {
+      Sound.correct();
+    } else {
+      Sound.wrong();
+    }
     p.answers[qid] = { choice: selected, correct, at: Date.now() };
     selected = null;
     // คลังข้อผิด
@@ -194,10 +200,10 @@ async function renderQuiz(examId) {
     const qid = p.qids[p.current], ans = p.answers[qid];
     if (/^[1-6]$/.test(e.key) && !ans) {
       const order = (p.choiceOrder && p.choiceOrder[qid]) || qmap[qid].choices.map((_, i) => i);
-      const k = order[+e.key - 1]; if (k !== undefined) { selected = k; renderQuestion(); }
-    } else if (e.key === 'Enter') { e.preventDefault(); if (!ans) submit(); else if (p.current < p.qids.length - 1) move(1); }
-    else if (e.key === 'ArrowRight') move(1);
-    else if (e.key === 'ArrowLeft') move(-1);
+      const k = order[+e.key - 1]; if (k !== undefined) { Sound.click(); selected = k; renderQuestion(); }
+    } else if (e.key === 'Enter') { e.preventDefault(); if (!ans) submit(); else if (p.current < p.qids.length - 1) { Sound.click(); move(1); } }
+    else if (e.key === 'ArrowRight') { Sound.click(); move(1); }
+    else if (e.key === 'ArrowLeft') { Sound.click(); move(-1); }
   };
   document.addEventListener('keydown', onKey);
   const onUnload = () => { if (!finished) Repo.saveProgress(u.id, examId, p); };

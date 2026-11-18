@@ -218,6 +218,7 @@ function shell(content, { active = '' } = {}) {
     ${brandHTML()}
     <nav class="nav">${nav.map(([k, l, h]) => `<a href="${h}" class="${active === k ? 'active' : ''}">${l}</a>`).join('')}</nav>
     <div class="top-actions">
+      <button class="icon-btn sound-toggle" title="${Sound.isEnabled() ? 'เปิดเสียงเอฟเฟกต์อยู่ (คลิกเพื่อปิด)' : 'ปิดเสียงเอฟเฟกต์อยู่ (คลิกเพื่อเปิด)'}" aria-label="เปิด/ปิดเสียง">${Sound.icon()}</button>
       <button class="icon-btn theme-toggle" title="สลับโหมดกลางวัน/กลางคืน" aria-label="สลับธีม">${Theme.icon()}</button>
       <div class="user-menu">
         <button class="avatar-btn" id="userMenuBtn"><span class="avatar">${esc(initials)}</span><span class="user-name">${esc(u.name || u.username)}</span></button>
@@ -420,6 +421,7 @@ function showContactModal(initialTopic = 'verify', customUsername = '') {
 
 function bindShell() {
   $$('.theme-toggle').forEach((b) => (b.onclick = Theme.toggle));
+  $$('.sound-toggle').forEach((b) => (b.onclick = () => Sound.toggle()));
   $$('[data-open-qr]').forEach((b) => (b.onclick = () => showContactModal(b.dataset.contactTopic || 'verify')));
   $$('[data-copy-line]').forEach((b) => (b.onclick = (e) => {
     e.stopPropagation();

@@ -273,3 +273,152 @@ function logoLoaderHTML(title = 'กำลังเตรียมข้อม�
     </div>
   `;
 }
+
+/* ===== Audio Effects Engine (Web Audio API Synthesizer) ===== */
+const Sound = {
+  ctx: null,
+  enabled: true,
+
+  init() {
+    try {
+      const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('kf-sound') : null;
+      this.enabled = saved !== '0';
+    } catch {
+      this.enabled = true;
+    }
+  },
+
+  isEnabled() {
+    return this.enabled;
+  },
+
+  toggle() {
+    this.enabled = !this.enabled;
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('kf-sound', this.enabled ? '1' : '0');
+    } catch {}
+    if (typeof $$ === 'function') {
+      $$('.sound-toggle').forEach((b) => {
+        b.innerHTML = Sound.icon();
+        b.setAttribute('title', this.enabled ? 'เปิดเสียงเอฟเฟกต์อยู่ (คลิกเพื่อปิด)' : 'ปิดเสียงเอฟเฟกต์อยู่ (คลิกเพื่อเปิด)');
+        b.setAttribute('aria-label', this.enabled ? 'ปิดเสียง' : 'เปิดเสียง');
+      });
+    }
+    if (this.enabled) {
+      this.click();
+      if (typeof toast === 'function') toast('🔊 เปิดเสียงเอฟเฟกต์แล้ว', 'info', 1500);
+    } else {
+      if (typeof toast === 'function') toast('🔇 ปิดเสียงเอฟเฟกต์แล้ว', 'info', 1500);
+    }
+    return this.enabled;
+  },
+
+  icon() {
+    return this.enabled
+      ? `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`
+      : `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`;
+  },
+
+  getCtx() {
+    try {
+      if (!this.ctx && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioCtx();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+      return this.ctx;
+    } catch {
+      return null;
+    }
+  },
+
+  // 1. เสียงตอนคลิก (Gentle UI click tap)
+  click() {
+    if (!this.enabled) return;
+    try {
+      const ctx = this.getCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(650, t);
+      osc.frequency.exponentialRampToValueAtTime(320, t + 0.04);
+
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + 0.045);
+    } catch {}
+  },
+
+  // 2. เสียงตอนตอบถูก (Cheerful pleasant chime / arpeggio)
+  correct() {
+    if (!this.enabled) return;
+    try {
+      const ctx = this.getCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      const notes = [
+        { freq: 523.25, time: 0, dur: 0.12 },
+        { freq: 659.25, time: 0.09, dur: 0.14 },
+        { freq: 783.99, time: 0.18, dur: 0.28 }
+      ];
+      notes.forEach(({ freq, time, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t + time);
+
+        gain.gain.setValueAtTime(0.12, t + time);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + time + dur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(t + time);
+        osc.stop(t + time + dur + 0.02);
+      });
+    } catch {}
+  },
+
+  // 3. เสียงตอนตอบผิด (Soft boing / low sine)
+  wrong() {
+    if (!this.enabled) return;
+    try {
+      const ctx = this.getCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      const notes = [
+        { freq: 310, time: 0, dur: 0.13 },
+        { freq: 220, time: 0.11, dur: 0.22 }
+      ];
+      notes.forEach(({ freq, time, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t + time);
+
+        gain.gain.setValueAtTime(0.14, t + time);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + time + dur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(t + time);
+        osc.stop(t + time + dur + 0.02);
+      });
+    } catch {}
+  }
+};
+
+Sound.init();
