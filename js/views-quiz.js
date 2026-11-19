@@ -48,7 +48,13 @@ async function renderQuiz(examId) {
       <button type="button" class="hl-dot hl-dot-pink" data-color="pink" title="ไฮไลท์สีชมพู"></button>
       <button type="button" class="hl-dot hl-dot-orange" data-color="orange" title="ไฮไลท์สีส้ม"></button>
       <button type="button" class="hl-dot hl-dot-blue" data-color="blue" title="ไฮไลท์สีฟ้า"></button>
-      <button type="button" class="hl-btn-clear" id="hlBtnClear" title="ลบไฮไลท์">🧹</button>
+      <button type="button" class="hl-btn-clear" id="hlBtnClear" title="ยางลบ / ลบไฮไลท์" aria-label="ยางลบลบไฮไลท์">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/>
+          <path d="M22 21H7"/>
+          <path d="m5 11 9 9"/>
+        </svg>
+      </button>
     </div>
   </div>`;
   bindShell();
