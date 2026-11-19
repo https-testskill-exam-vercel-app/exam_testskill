@@ -42,12 +42,151 @@ async function renderQuiz(examId) {
         <p class="muted small center">ระบบบันทึกอัตโนมัติ ออกแล้วกลับมาทำต่อได้</p>
       </aside>
     </div>
+    <div id="hlToolbar" class="hl-toolbar" style="display:none;" role="toolbar" aria-label="เครื่องมือไฮไลท์">
+      <button type="button" class="hl-dot hl-dot-yellow" data-color="yellow" title="ไฮไลท์สีเหลือง"></button>
+      <button type="button" class="hl-dot hl-dot-green" data-color="green" title="ไฮไลท์สีเขียว"></button>
+      <button type="button" class="hl-dot hl-dot-pink" data-color="pink" title="ไฮไลท์สีชมพู"></button>
+      <button type="button" class="hl-dot hl-dot-orange" data-color="orange" title="ไฮไลท์สีส้ม"></button>
+      <button type="button" class="hl-dot hl-dot-blue" data-color="blue" title="ไฮไลท์สีฟ้า"></button>
+      <button type="button" class="hl-btn-clear" id="hlBtnClear" title="ลบไฮไลท์">🧹</button>
+    </div>
   </div>`;
   bindShell();
 
   const save = async () => { dirty = false; await Repo.saveProgress(u.id, examId, p); };
   const answeredCount = () => Object.keys(p.answers).length;
   const correctCount = () => Object.values(p.answers).filter((a) => a.correct).length;
+
+  p.highlights = p.highlights || {};
+  let pendingHlText = '';
+
+  function highlightText(rawText, items) {
+    let s = esc(rawText);
+    if (!items || !items.length) return s;
+    const valid = items.filter((x) => x && x.text && x.text.trim().length > 0);
+    if (!valid.length) return s;
+
+    const sorted = [...valid].sort((a, b) => b.text.trim().length - a.text.trim().length);
+    const tokens = [];
+
+    sorted.forEach((item, idx) => {
+      const rawPhrase = item.text.trim();
+      const escPhrase = esc(rawPhrase);
+      const escapedRegex = escPhrase.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      const re = new RegExp(escapedRegex, 'gi');
+      s = s.replace(re, (match) => {
+        const token = `@@@HL_${tokens.length}_${idx}@@@`;
+        tokens.push({
+          token,
+          html: `<mark class="hl hl-${item.color || 'yellow'}" data-hl="${esc(rawPhrase)}" title="คลิกเพื่อเปลี่ยนสีหรือลบไฮไลท์">${match}</mark>`
+        });
+        return token;
+      });
+    });
+
+    tokens.forEach((t) => {
+      s = s.replace(t.token, t.html);
+    });
+
+    return s;
+  }
+
+  function showToolbarAtRect(rect) {
+    const toolbar = document.getElementById('hlToolbar');
+    if (!toolbar) return;
+    toolbar.style.display = 'flex';
+    const width = toolbar.offsetWidth || 230;
+    let top = rect.top + window.scrollY - 48;
+    if (top < window.scrollY + 10) {
+      top = rect.bottom + window.scrollY + 8;
+    }
+    let left = rect.left + window.scrollX + (rect.width / 2);
+    const maxLeft = window.innerWidth - (width / 2) - 12;
+    const minLeft = (width / 2) + 12;
+    left = Math.max(minLeft, Math.min(maxLeft, left));
+    toolbar.style.top = `${top}px`;
+    toolbar.style.left = `${left}px`;
+  }
+
+  function handleSelection() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+      const toolbar = document.getElementById('hlToolbar');
+      if (toolbar && !toolbar.dataset.sticky) {
+        toolbar.style.display = 'none';
+      }
+      return;
+    }
+    const text = sel.toString().trim();
+    if (!text) return;
+
+    const qcard = document.getElementById('qcard');
+    if (!qcard) return;
+    const range = sel.getRangeAt(0);
+    const common = range.commonAncestorContainer;
+    if (!qcard.contains(common)) return;
+
+    pendingHlText = text;
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+    showToolbarAtRect(rect);
+  }
+
+  function applyHighlightColor(color) {
+    const text = (pendingHlText || '').trim();
+    if (!text) return;
+    const qid = p.qids[p.current];
+    p.highlights = p.highlights || {};
+    p.highlights[qid] = p.highlights[qid] || [];
+
+    const idx = p.highlights[qid].findIndex((h) => h.text.toLowerCase() === text.toLowerCase());
+    if (idx >= 0) {
+      p.highlights[qid][idx].color = color;
+    } else {
+      p.highlights[qid].push({ text, color });
+    }
+
+    const sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+    pendingHlText = '';
+
+    const toolbar = document.getElementById('hlToolbar');
+    if (toolbar) {
+      toolbar.style.display = 'none';
+      delete toolbar.dataset.sticky;
+    }
+
+    Sound.click();
+    renderQuestion();
+    save();
+  }
+
+  function clearHighlightText() {
+    const text = (pendingHlText || '').trim();
+    const qid = p.qids[p.current];
+    if (p.highlights && p.highlights[qid]) {
+      if (text) {
+        p.highlights[qid] = p.highlights[qid].filter((h) => h.text.toLowerCase() !== text.toLowerCase());
+        if (p.highlights[qid].length === 0) delete p.highlights[qid];
+      } else {
+        delete p.highlights[qid];
+      }
+    }
+
+    const sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+    pendingHlText = '';
+
+    const toolbar = document.getElementById('hlToolbar');
+    if (toolbar) {
+      toolbar.style.display = 'none';
+      delete toolbar.dataset.sticky;
+    }
+
+    Sound.click();
+    renderQuestion();
+    save();
+  }
 
   function renderNav() {
     $('#navGrid').innerHTML = p.qids.map((id, i) => {
@@ -66,11 +205,14 @@ async function renderQuiz(examId) {
     const qid = p.qids[p.current], q = qmap[qid], ans = p.answers[qid];
     const order = (p.choiceOrder && p.choiceOrder[qid]) || q.choices.map((_, i) => i);
     const sub = subjectById(q.subject);
+    const qHighlights = (p.highlights && p.highlights[qid]) || [];
+    const hasHighlights = qHighlights.length > 0;
+
     const choiceHTML = order.map((k, pos) => {
       let cls = '';
       if (ans) cls = k === q.answer ? 'correct' : (k === ans.choice ? 'wrong' : 'dim');
       else if (selected === k) cls = 'selected';
-      return `<button class="choice ${cls}" data-k="${k}" ${ans ? 'disabled' : ''}><span class="choice-label">${TH_LABELS[pos]}</span><span class="choice-text">${esc(q.choices[k])}</span>
+      return `<button class="choice ${cls}" data-k="${k}" ${ans ? 'disabled' : ''}><span class="choice-label">${TH_LABELS[pos]}</span><span class="choice-text">${highlightText(q.choices[k], qHighlights)}</span>
         ${ans && k === q.answer ? '<span class="choice-icon">✓</span>' : ''}${ans && k === ans.choice && !ans.correct ? '<span class="choice-icon">✗</span>' : ''}</button>`;
     }).join('');
     const correctLabel = TH_LABELS[order.indexOf(q.answer)];
@@ -79,13 +221,14 @@ async function renderQuiz(examId) {
       <div class="q-meta"><span class="chip">ข้อ ${p.current + 1} / ${p.qids.length}</span>
         <span class="chip chip-muted">${sub.icon} ${sub.id.startsWith('M') ? esc(sub.short) : 'เรื่อง ' + sub.id}${q.topic ? ' · ' + esc(q.topic) : ''}</span>
         <span class="spacer"></span>
+        ${hasHighlights ? `<button class="icon-btn on" id="clearHlBtn" title="ล้างไฮไลท์ทั้งหมดในข้อนี้ (${qHighlights.length})">🖍️<span class="hl-badge">${qHighlights.length}</span></button>` : ''}
         <button class="icon-btn ${p.flags.includes(qid) ? 'on' : ''}" id="flagBtn" title="ทำเครื่องหมายไว้กลับมาดู">🚩</button>
         <button class="icon-btn ${bookmarks.has(qid) ? 'on' : ''}" id="bmBtn" title="บันทึกข้อนี้ไว้ทบทวน">🔖</button></div>
-      <h2 class="q-text">${esc(q.question)}</h2>
+      <h2 class="q-text">${highlightText(q.question, qHighlights)}</h2>
       <div class="choices">${choiceHTML}</div>
       ${ans ? `<div class="feedback ${ans.correct ? 'fb-ok' : 'fb-bad'}">
-          <div class="fb-head">${ans.correct ? '🎉 ถูกต้อง! เยี่ยมมาก' : `❌ ยังไม่ถูก — คำตอบที่ถูกคือ <b>${correctLabel}. ${esc(q.choices[q.answer])}</b>`}</div>
-          <div class="tip"><b>💡 เกร็ดความรู้</b><div id="explainBox">${q.explain ? `<p>${esc(q.explain)}</p>` : (AI.enabled() ? '<button class="btn btn-ghost btn-sm" id="aiExplainBtn">✨ ให้ AI อธิบายข้อนี้</button>' : '<p class="muted">ยังไม่มีคำอธิบายสำหรับข้อนี้</p>')}</div></div>
+          <div class="fb-head">${ans.correct ? '🎉 ถูกต้อง! เยี่ยมมาก' : `❌ ยังไม่ถูก — คำตอบที่ถูกคือ <b>${correctLabel}. ${highlightText(q.choices[q.answer], qHighlights)}</b>`}</div>
+          <div class="tip"><b>💡 เกร็ดความรู้</b><div id="explainBox">${q.explain ? `<p>${highlightText(q.explain, qHighlights)}</p>` : (AI.enabled() ? '<button class="btn btn-ghost btn-sm" id="aiExplainBtn">✨ ให้ AI อธิบายข้อนี้</button>' : '<p class="muted">ยังไม่มีคำอธิบายสำหรับข้อนี้</p>')}</div></div>
         </div>` : ''}
       <div class="q-actions">
         <button class="btn btn-ghost" id="prevBtn" ${p.current === 0 ? 'disabled' : ''}>← ก่อนหน้า</button>
@@ -93,9 +236,31 @@ async function renderQuiz(examId) {
         ${ans ? (p.current < p.qids.length - 1 ? '<button class="btn btn-primary" id="nextBtn">ข้อถัดไป →</button>' : '<button class="btn btn-primary" id="endBtn">ส่งแบบทดสอบ & ดูผล</button>')
         : `<button class="btn btn-ghost" id="skipBtn">ข้าม</button><button class="btn btn-primary" id="submitBtn" ${selected == null ? 'disabled' : ''}>ส่งคำตอบ</button>`}
       </div>
-      <p class="kbd-hint muted small">คีย์ลัด: 1–4 เลือกตัวเลือก · Enter ส่งคำตอบ/ข้อถัดไป · ← → เปลี่ยนข้อ</p>`;
+      <p class="kbd-hint muted small">คีย์ลัด: 1–4 เลือกตัวเลือก · Enter ส่งคำตอบ/ข้อถัดไป · ← → เปลี่ยนข้อ · ลากเมาส์เพื่อไฮไลท์</p>`;
 
-    $$('#qcard .choice').forEach((b) => (b.onclick = () => { if (ans) return; Sound.click(); selected = +b.dataset.k; renderQuestion(); }));
+    $$('#qcard .choice').forEach((b) => (b.onclick = () => {
+      if (ans) return;
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim().length > 0) return;
+      Sound.click();
+      selected = +b.dataset.k;
+      renderQuestion();
+    }));
+
+    $$('#qcard mark.hl').forEach((m) => {
+      m.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const hlText = m.dataset.hl || m.textContent;
+        pendingHlText = (hlText || '').trim();
+        const rect = m.getBoundingClientRect();
+        const toolbar = document.getElementById('hlToolbar');
+        if (toolbar) {
+          toolbar.dataset.sticky = '1';
+          showToolbarAtRect(rect);
+        }
+      };
+    });
     const on = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
     on('submitBtn', submit);
     on('nextBtn', () => { Sound.click(); move(1); });
@@ -108,6 +273,14 @@ async function renderQuiz(examId) {
       await Repo.saveBookmarks(u.id, [...bookmarks]);
       toast(bookmarks.has(qid) ? 'บันทึกข้อนี้แล้ว' : 'นำออกจากรายการบันทึกแล้ว', 'success', 1600);
       renderQuestion();
+    });
+    on('clearHlBtn', () => {
+      if (p.highlights && p.highlights[qid]) {
+        delete p.highlights[qid];
+        toast('ล้างไฮไลท์ในข้อนี้แล้ว', 'info', 1400);
+        renderQuestion();
+        save();
+      }
     });
     on('aiExplainBtn', async () => {
       const box = $('#explainBox');
@@ -211,11 +384,46 @@ async function renderQuiz(examId) {
   const onVis = () => { if (document.hidden && !finished) save(); };
   document.addEventListener('visibilitychange', onVis);
 
+  const onDocMouseDown = (e) => {
+    const toolbar = document.getElementById('hlToolbar');
+    if (!toolbar || toolbar.style.display === 'none') return;
+    if (!toolbar.contains(e.target) && !e.target.closest('mark.hl')) {
+      toolbar.style.display = 'none';
+      delete toolbar.dataset.sticky;
+    }
+  };
+  const onTouchEnd = () => setTimeout(handleSelection, 200);
+
+  document.addEventListener('mouseup', handleSelection);
+  document.addEventListener('touchend', onTouchEnd);
+  document.addEventListener('mousedown', onDocMouseDown);
+
+  $$('#hlToolbar .hl-dot').forEach((btn) => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      applyHighlightColor(btn.dataset.color);
+    };
+  });
+  const hlClearBtn = document.getElementById('hlBtnClear');
+  if (hlClearBtn) {
+    hlClearBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearHighlightText();
+    };
+  }
+
   onCleanup(async () => {
     clearInterval(timerId);
     document.removeEventListener('keydown', onKey);
     window.removeEventListener('beforeunload', onUnload);
     document.removeEventListener('visibilitychange', onVis);
+    document.removeEventListener('mouseup', handleSelection);
+    document.removeEventListener('touchend', onTouchEnd);
+    document.removeEventListener('mousedown', onDocMouseDown);
+    const tb = document.getElementById('hlToolbar');
+    if (tb) tb.remove();
     if (!finished) await save();
   });
 
