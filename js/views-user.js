@@ -510,7 +510,7 @@ async function renderHome() {
         <img class="hero-home-logo" src="assets/logo-testskill.jpg" alt="TestSkill ระบบสอบออนไลน์ By กลางฟู">
         <div class="hero-text-wrap">
           <p class="eyebrow">สวัสดี, ${esc(u.name || u.username)} 👋 <span class="role-badge ${u.role === 'admin' ? 'role-admin' : 'role-user'}">${u.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน'}</span></p>
-          <h1 class="hero-title"><span class="hero-en-highlight">Test Skill</span> เตรียมความพร้อมก่อนสอบจริง</h1>
+          <h1 class="hero-title"><span class="hero-en-highlight">Test Skill</span><span class="hero-th-title">เตรียมความพร้อมก่อนสอบจริง</span></h1>
           <p class="muted">ใบประกอบวิชาชีพครู By กลางฟู · เกณฑ์ผ่าน <b>${s.passPercent}%</b> · ทำครบทุกเรื่อง แล้วปิดท้ายด้วยชุดรวมเสมือนจริง</p>
         </div>
       </div>
