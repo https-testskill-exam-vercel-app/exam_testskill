@@ -1529,9 +1529,47 @@ button {
   align-items: center;
   gap: 1rem;
   text-align: left;
+  color: var(--text-main);
+  text-decoration: none;
+  transition: all var(--transition-fast);
 }
 .tool-icon { font-size: 1.75rem; flex-shrink: 0; }
-.tool-card b { display: block; font-size: 0.95rem; }
+.tool-card b {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  margin-bottom: 0.2rem;
+}
+.tool-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--border-focus);
+}
+.tool-card:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+[data-theme="dark"] .tool-card {
+  color: #ffffff;
+}
+[data-theme="dark"] .tool-card b {
+  color: #ffffff !important;
+}
+[data-theme="dark"] .tool-card .muted,
+[data-theme="dark"] .tool-card small {
+  color: #cbd5e1 !important;
+}
+[data-theme="dark"] .tool-card:disabled {
+  opacity: 0.72;
+  color: #ffffff;
+}
+[data-theme="dark"] .tool-card:disabled b {
+  color: #ffffff !important;
+}
+[data-theme="dark"] .tool-card:disabled small,
+[data-theme="dark"] .tool-card:disabled .muted {
+  color: #94a3b8 !important;
+}
 
 /* ================= Quiz View (Mobile Optimized) ================= */
 .quiz-page {
