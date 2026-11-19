@@ -15,6 +15,7 @@
   --border: #e2e8f0;
   --border-focus: #2563eb;
 
+  --text: #0f172a;
   --text-main: #0f172a;
   --text-sub: #334155;
   --text-muted: #64748b;
@@ -65,6 +66,7 @@
   --border: #1f293d;
   --border-focus: #3b82f6;
 
+  --text: #f8fafc;
   --text-main: #f8fafc;
   --text-sub: #cbd5e1;
   --text-muted: #94a3b8;
@@ -1370,6 +1372,7 @@ button {
   transition: all var(--transition-fast);
   text-align: left;
   gap: 0.85rem;
+  color: var(--text-main);
 }
 .set-row:hover {
   background: var(--primary-light);
@@ -1400,7 +1403,7 @@ button {
 }
 .set-title-text {
   font-size: 0.9rem;
-  color: var(--text);
+  color: var(--text-main);
   line-height: 1.35;
   word-break: break-word;
 }
@@ -1412,6 +1415,51 @@ button {
 }
 .set-row .arrow { color: var(--text-muted); font-size: 1rem; transition: transform var(--transition-fast); }
 .set-row:hover .arrow { transform: translateX(3px); color: var(--primary); }
+
+/* โหมดดวงจันทร์ (Dark Mode) สำหรับการ์ด 5 เรื่อง และรายการชุดข้อสอบ */
+[data-theme="dark"] .subject-card {
+  color: #ffffff;
+}
+[data-theme="dark"] .subject-card h3 {
+  color: #ffffff;
+}
+[data-theme="dark"] .subject-card p.muted,
+[data-theme="dark"] .subject-card .small.muted {
+  color: #cbd5e1;
+}
+[data-theme="dark"] .set-row {
+  background: rgba(15, 23, 42, 0.75);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+[data-theme="dark"] .set-row:hover {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(96, 165, 250, 0.45);
+}
+[data-theme="dark"] .set-title-text {
+  color: #ffffff !important;
+}
+[data-theme="dark"] .set-row-info small,
+[data-theme="dark"] .set-row-info small.muted,
+[data-theme="dark"] .set-row .muted {
+  color: #e2e8f0 !important;
+}
+[data-theme="dark"] .set-row .arrow {
+  color: #cbd5e1;
+}
+[data-theme="dark"] .set-row:hover .arrow {
+  color: #60a5fa;
+}
+[data-theme="dark"] .subject-card .btn-ghost {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+[data-theme="dark"] .subject-card .btn-ghost:hover {
+  background: rgba(59, 130, 246, 0.25);
+  color: #ffffff !important;
+  border-color: var(--primary);
+}
 
 /* Exam intro modal */
 .exam-intro-box {
@@ -1431,7 +1479,7 @@ button {
   font-weight: 700;
   line-height: 1.45;
   margin: 0;
-  color: var(--text);
+  color: var(--text-main);
 }
 .exam-intro-doc {
   margin: 0;
