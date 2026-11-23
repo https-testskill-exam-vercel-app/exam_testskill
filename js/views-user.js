@@ -423,9 +423,11 @@ function renderLogin(initialTab = 'login') {
 
 async function renderHome() {
   const u = App.user, s = App.settings;
-  const [catalog, history, progressList, wrong, bookmarks] = await Promise.all([
-    Exams.catalog(s), Repo.getHistory(u.id), Repo.listProgress(u.id), Repo.getWrong(u.id), Repo.getBookmarks(u.id)
+  const [catalog, history, progressList, wrong, bookmarks, starredList] = await Promise.all([
+    Exams.catalog(s), Repo.getHistory(u.id), Repo.listProgress(u.id), Repo.getWrong(u.id), Repo.getBookmarks(u.id), Repo.getStarred(u.id)
   ]);
+  const starred = new Set(starredList || []);
+  const starBtnHTML = (id) => `<span role="button" tabindex="0" class="btn-star-set ${starred.has(id) ? 'starred' : ''}" data-star-exam="${id}" title="${starred.has(id) ? 'ยกเลิกติดดาวชุดนี้' : 'ติดดาวชุดข้อสอบนี้'}" aria-label="ติดดาว">${starred.has(id) ? '⭐' : '☆'}</span>`;
   const summaries = {};
   for (const sub of SUBJECTS) summaries[sub.id] = !!(await Repo.getSummary(sub.id));
   const best = {};
@@ -442,7 +444,8 @@ async function renderHome() {
       : b ? `<span class="chip ${b.passed ? 'chip-success' : 'chip-danger'}">${b.passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${b.percent}%</span>`
         : '<span class="chip">ยังไม่ได้ทำ</span>';
     const shortTitle = set.shortName || set.title || `ชุดที่ ${set.set}`;
-    return `<button class="set-row" data-exam="${set.id}">
+    const isStarred = starred.has(set.id);
+    return `<button class="set-row ${isStarred ? 'is-starred' : ''}" data-exam="${set.id}">
       <div class="set-row-info">
         <div class="set-row-head">
           <span class="set-badge">ชุดที่ ${set.set}</span>
@@ -450,7 +453,7 @@ async function renderHome() {
         </div>
         <small class="muted">${set.count} ข้อ · เกณฑ์ผ่าน ${s.passPercent}%</small>
       </div>
-      <div class="set-row-actions">${status}<span class="arrow">→</span></div>
+      <div class="set-row-actions">${starBtnHTML(set.id)}${status}<span class="arrow">→</span></div>
     </button>`;
   };
 
@@ -523,7 +526,7 @@ async function renderHome() {
     </section>
 
     ${progressList.length ? `<section class="card resume-card"><div class="section-title"><h2>⏸ ทำค้างไว้</h2></div>
-      ${progressList.map((p) => `<div class="resume-row"><div><b>${esc(Exams.title(p.examId))}</b>
+      ${progressList.map((p) => `<div class="resume-row"><div><div class="resume-row-title-head"><b>${esc(Exams.title(p.examId))}</b>${starBtnHTML(p.examId)}</div>
         <small class="muted">ตอบแล้ว ${Object.keys(p.answers).length}/${p.qids.length} ข้อ ${p.timed ? '· เหลือเวลา ' + fmtTime(p.remaining) : ''} · ล่าสุด ${fmtDate(p.updatedAt)}</small></div>
         <div class="row-actions">
           <button class="btn btn-primary btn-sm" data-resume="${p.examId}">ทำต่อ</button>
@@ -553,14 +556,14 @@ async function renderHome() {
                 <small class="btn-final-sub">สุ่มคละจากคลัง 2,295 ข้อ เสมือนสอบจริง</small>
               </div>
               <span class="btn-final-arrow">→</span>
-            </button>` : '<span class="chip chip-glass">🔒 ไม่มีสิทธิ์เข้าถึง</span>'}
+            </button>${starBtnHTML('FINAL')}` : '<span class="chip chip-glass">🔒 ไม่มีสิทธิ์เข้าถึง</span>'}
         </div>
       </div>
 
       <div class="final-sets-grid">
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 1 (ปี 2566)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 1 (ปี 2566)</span>${starBtnHTML('FINAL-1')}</div>
               <h4>เทียบเคียงข้อสอบจริง คุรุสภา ปี 2566</h4>
               <p class="muted-light">50 ข้อ · คละ 5 หมวดวิชา · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-1'] ? `<span class="chip ${best['FINAL-1'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-1'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-1'].percent}%</span>` : ''}
@@ -570,7 +573,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 2 (ปี 2567)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 2 (ปี 2567)</span>${starBtnHTML('FINAL-2')}</div>
               <h4>เทียบเคียงข้อสอบจริง คุรุสภา ปี 2567</h4>
               <p class="muted-light">50 ข้อ · Scenario, AI, PDPA & จริยธรรม · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-2'] ? `<span class="chip ${best['FINAL-2'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-2'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-2'].percent}%</span>` : ''}
@@ -580,7 +583,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 3 (เสมือนจริง 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 3 (เสมือนจริง 100 ข้อ)</span>${starBtnHTML('FINAL-3')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง (ชุดที่ 1)</h4>
               <p class="muted-light">100 ข้อ · ระดับความยาก 4 ระดับ คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-3'] ? `<span class="chip ${best['FINAL-3'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-3'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-3'].percent}%</span>` : ''}
@@ -590,7 +593,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 4 (เสมือนจริง 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 4 (เสมือนจริง 100 ข้อ)</span>${starBtnHTML('FINAL-4')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง (ชุดที่ 2)</h4>
               <p class="muted-light">100 ข้อ · Big Data, Burnout, PLC & SAMR · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-4'] ? `<span class="chip ${best['FINAL-4'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-4'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-4'].percent}%</span>` : ''}
@@ -600,7 +603,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 5 (เกณฑ์คุรุสภา 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 5 (เกณฑ์คุรุสภา 100 ข้อ)</span>${starBtnHTML('FINAL-5')}</div>
               <h4>แบบทดสอบจำลองวัดความรู้ประเมินสมรรถนะวิชาชีพครู</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-5'] ? `<span class="chip ${best['FINAL-5'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-5'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-5'].percent}%</span>` : ''}
@@ -610,7 +613,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 6 (เกณฑ์คุรุสภา ชุดที่ 2 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 6 (เกณฑ์คุรุสภา ชุดที่ 2 100 ข้อ)</span>${starBtnHTML('FINAL-6')}</div>
               <h4>แบบทดสอบจำลองวัดความรู้ประเมินสมรรถนะวิชาชีพครู (ชุดที่ 2)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-6'] ? `<span class="chip ${best['FINAL-6'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-6'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-6'].percent}%</span>` : ''}
@@ -620,7 +623,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 7 (เกณฑ์คุรุสภา ชุดที่ 3 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 7 (เกณฑ์คุรุสภา ชุดที่ 3 100 ข้อ)</span>${starBtnHTML('FINAL-7')}</div>
               <h4>แบบทดสอบจำลองวัดความรู้ประเมินสมรรถนะวิชาชีพครู (ชุดที่ 3)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-7'] ? `<span class="chip ${best['FINAL-7'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-7'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-7'].percent}%</span>` : ''}
@@ -630,7 +633,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 8 (เกณฑ์คุรุสภา ชุดที่ 4 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 8 (เกณฑ์คุรุสภา ชุดที่ 4 100 ข้อ)</span>${starBtnHTML('FINAL-8')}</div>
               <h4>แบบทดสอบจำลองวัดความรู้ประเมินสมรรถนะวิชาชีพครู (ชุดที่ 4)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-8'] ? `<span class="chip ${best['FINAL-8'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-8'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-8'].percent}%</span>` : ''}
@@ -640,7 +643,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 9 (เกณฑ์คุรุสภา ชุดที่ 6 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 9 (เกณฑ์คุรุสภา ชุดที่ 6 100 ข้อ)</span>${starBtnHTML('FINAL-9')}</div>
               <h4>แบบทดสอบจำลองวัดความรู้ประเมินสมรรถนะวิชาชีพครู (ชุดที่ 6)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-9'] ? `<span class="chip ${best['FINAL-9'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-9'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-9'].percent}%</span>` : ''}
@@ -650,7 +653,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 10 (เกณฑ์คุรุสภา ชุดที่ 7 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 10 (เกณฑ์คุรุสภา ชุดที่ 7 100 ข้อ)</span>${starBtnHTML('FINAL-10')}</div>
               <h4>แบบทดสอบจำลองวัดความรู้ประเมินสมรรถนะวิชาชีพครู (ชุดที่ 7)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-10'] ? `<span class="chip ${best['FINAL-10'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-10'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-10'].percent}%</span>` : ''}
@@ -660,7 +663,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 11 (เกณฑ์คุรุสภา ชุดที่ 8 95 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 11 (เกณฑ์คุรุสภา ชุดที่ 8 95 ข้อ)</span>${starBtnHTML('FINAL-11')}</div>
               <h4>แบบทดสอบจำลองวัดความรู้ประเมินสมรรถนะวิชาชีพครู (ชุดที่ 8)</h4>
               <p class="muted-light">95 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-11'] ? `<span class="chip ${best['FINAL-11'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-11'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-11'].percent}%</span>` : ''}
@@ -670,7 +673,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 12 (เสมือนจริงตามเกณฑ์ 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 12 (เสมือนจริงตามเกณฑ์ 100 ข้อ)</span>${starBtnHTML('FINAL-12')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-12'] ? `<span class="chip ${best['FINAL-12'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-12'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-12'].percent}%</span>` : ''}
@@ -680,7 +683,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 13 (เสมือนจริงตามเกณฑ์ ชุด 2 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 13 (เสมือนจริงตามเกณฑ์ ชุด 2 100 ข้อ)</span>${starBtnHTML('FINAL-13')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 2)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-13'] ? `<span class="chip ${best['FINAL-13'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-13'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-13'].percent}%</span>` : ''}
@@ -690,7 +693,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 14 (เสมือนจริงตามเกณฑ์ ชุด 3 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 14 (เสมือนจริงตามเกณฑ์ ชุด 3 100 ข้อ)</span>${starBtnHTML('FINAL-14')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 3)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-14'] ? `<span class="chip ${best['FINAL-14'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-14'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-14'].percent}%</span>` : ''}
@@ -700,7 +703,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 15 (เสมือนจริงตามเกณฑ์ ชุด 4 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 15 (เสมือนจริงตามเกณฑ์ ชุด 4 100 ข้อ)</span>${starBtnHTML('FINAL-15')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 4)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-15'] ? `<span class="chip ${best['FINAL-15'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-15'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-15'].percent}%</span>` : ''}
@@ -710,7 +713,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 16 (เสมือนจริงตามเกณฑ์ ชุด 5 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 16 (เสมือนจริงตามเกณฑ์ ชุด 5 100 ข้อ)</span>${starBtnHTML('FINAL-16')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 5)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-16'] ? `<span class="chip ${best['FINAL-16'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-16'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-16'].percent}%</span>` : ''}
@@ -720,7 +723,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 17 (เสมือนจริงตามเกณฑ์ ชุด 6 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 17 (เสมือนจริงตามเกณฑ์ ชุด 6 100 ข้อ)</span>${starBtnHTML('FINAL-17')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 6)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-17'] ? `<span class="chip ${best['FINAL-17'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-17'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-17'].percent}%</span>` : ''}
@@ -730,7 +733,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 18 (เสมือนจริงตามเกณฑ์ ชุด 7 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 18 (เสมือนจริงตามเกณฑ์ ชุด 7 100 ข้อ)</span>${starBtnHTML('FINAL-18')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 7)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-18'] ? `<span class="chip ${best['FINAL-18'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-18'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-18'].percent}%</span>` : ''}
@@ -740,7 +743,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 19 (เสมือนจริงตามเกณฑ์ ชุด 8 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 19 (เสมือนจริงตามเกณฑ์ ชุด 8 100 ข้อ)</span>${starBtnHTML('FINAL-19')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 8)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-19'] ? `<span class="chip ${best['FINAL-19'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-19'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-19'].percent}%</span>` : ''}
@@ -750,7 +753,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 20 (เสมือนจริงตามเกณฑ์ ชุด 9 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 20 (เสมือนจริงตามเกณฑ์ ชุด 9 100 ข้อ)</span>${starBtnHTML('FINAL-20')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 9)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-20'] ? `<span class="chip ${best['FINAL-20'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-20'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-20'].percent}%</span>` : ''}
@@ -760,7 +763,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 21 (เสมือนจริงตามเกณฑ์ ชุด 10 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 21 (เสมือนจริงตามเกณฑ์ ชุด 10 100 ข้อ)</span>${starBtnHTML('FINAL-21')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 10)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-21'] ? `<span class="chip ${best['FINAL-21'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-21'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-21'].percent}%</span>` : ''}
@@ -770,7 +773,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 22 (เสมือนจริงตามเกณฑ์ ชุด 11 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 22 (เสมือนจริงตามเกณฑ์ ชุด 11 100 ข้อ)</span>${starBtnHTML('FINAL-22')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 11)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-22'] ? `<span class="chip ${best['FINAL-22'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-22'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-22'].percent}%</span>` : ''}
@@ -780,7 +783,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 23 (เสมือนจริงตามเกณฑ์ ชุด 12 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 23 (เสมือนจริงตามเกณฑ์ ชุด 12 100 ข้อ)</span>${starBtnHTML('FINAL-23')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 12)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-23'] ? `<span class="chip ${best['FINAL-23'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-23'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-23'].percent}%</span>` : ''}
@@ -790,7 +793,7 @@ async function renderHome() {
 
           <div class="final-set-card">
             <div class="final-set-info">
-              <span class="chip chip-glass">ชุดที่ 24 (เสมือนจริงตามเกณฑ์ ชุด 13 100 ข้อ)</span>
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 24 (เสมือนจริงตามเกณฑ์ ชุด 13 100 ข้อ)</span>${starBtnHTML('FINAL-24')}</div>
               <h4>แบบจำลองข้อสอบเสมือนจริง การประเมินสมรรถนะครู (ชุดที่ 13)</h4>
               <p class="muted-light">100 ข้อ · ความยาก 4 เลเวล คละ 5 หมวด · เกณฑ์ผ่าน ${s.passPercent}%</p>
               ${best['FINAL-24'] ? `<span class="chip ${best['FINAL-24'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-24'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-24'].percent}%</span>` : ''}
@@ -809,6 +812,8 @@ async function renderHome() {
         <span class="tool-icon">🔁</span><div><b>ทบทวนข้อที่เคยตอบผิด</b><small class="muted">${wrongCount ? `มี ${wrongCount} ข้อรอทบทวน (ตอบถูกแล้วจะหายไป)` : 'ยังไม่มีข้อที่ตอบผิด'}</small></div></button>
       <button class="card tool-card" data-exam="BOOKMARK" ${bookmarks.length ? '' : 'disabled'}>
         <span class="tool-icon">🔖</span><div><b>ข้อที่บันทึกไว้</b><small class="muted">${bookmarks.length ? `${bookmarks.length} ข้อ` : 'กดไอคอน 🔖 ระหว่างทำข้อสอบเพื่อบันทึก'}</small></div></button>
+      <button class="card tool-card" id="btnStarredSets" ${starred.size ? '' : 'disabled'}>
+        <span class="tool-icon">⭐</span><div><b>ชุดข้อสอบที่ติดดาวไว้</b><small class="muted" id="starredSetsCount">${starred.size ? `${starred.size} ชุดที่เลือกไว้` : 'กด ⭐ ที่ชุดข้อสอบเพื่อติดดาว'}</small></div></button>
       <a class="card tool-card" href="#/history"><span class="tool-icon">📈</span><div><b>ประวัติ & พัฒนาการ</b><small class="muted">ดูผลสอบย้อนหลังทั้งหมด</small></div></a>
     </section>
 
@@ -830,7 +835,53 @@ async function renderHome() {
     </div>
   `, { active: 'home' });
 
-  $$('[data-exam]').forEach((b) => (b.onclick = () => startExam(b.dataset.exam)));
+  $('[data-star-exam]').forEach((b) => {
+    b.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const examId = b.dataset.starExam;
+      if (!examId) return;
+      if (starred.has(examId)) {
+        starred.delete(examId);
+      } else {
+        starred.add(examId);
+      }
+      await Repo.saveStarred(u.id, [...starred]);
+      const isNowStarred = starred.has(examId);
+      
+      $(`[data-star-exam="${examId}"]`).forEach((el) => {
+        el.classList.toggle('starred', isNowStarred);
+        el.innerHTML = isNowStarred ? '⭐' : '☆';
+        el.title = isNowStarred ? 'ยกเลิกติดดาวชุดนี้' : 'ติดดาวชุดข้อสอบนี้';
+      });
+      $(`.set-row[data-exam="${examId}"]`).forEach((row) => {
+        row.classList.toggle('is-starred', isNowStarred);
+      });
+      
+      const starredCard = $('#btnStarredSets');
+      const starredCount = $('#starredSetsCount');
+      if (starredCard && starredCount) {
+        starredCard.disabled = starred.size === 0;
+        starredCount.textContent = starred.size ? `${starred.size} ชุดที่เลือกไว้` : 'กด ⭐ ที่ชุดข้อสอบเพื่อติดดาว';
+      }
+      
+      toast(isNowStarred ? '⭐ ติดดาวชุดข้อสอบนี้แล้ว' : 'ยกเลิกการติดดาวชุดข้อสอบแล้ว', 'success', 1400);
+    };
+    b.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        b.click();
+      }
+    };
+  });
+
+  const starredBtn = $('#btnStarredSets');
+  if (starredBtn) {
+    starredBtn.onclick = () => showStarredSetsModal(starred, best, progMap, s);
+  }
+
+  $('[data-exam]').forEach((b) => (b.onclick = () => startExam(b.dataset.exam)));
   $$('[data-resume]').forEach((b) => (b.onclick = () => go('/exam/' + b.dataset.resume)));
   $$('[data-restart]').forEach((b) => (b.onclick = async () => {
     if (await confirmBox('เริ่มทำใหม่?', 'คำตอบที่ทำค้างไว้ในชุดนี้จะถูกลบ', 'เริ่มใหม่', true)) newAttempt(b.dataset.restart);
@@ -1160,3 +1211,91 @@ async function renderSummary(sid) {
 
 window.renderUserHome = renderHome;
 
+
+async function showStarredSetsModal(starred, best, progMap, s) {
+  const ids = [...starred];
+  if (!ids.length) {
+    return toast('ยังไม่มีชุดข้อสอบที่ติดดาวไว้ (กดไอคอน ⭐ ที่ชุดข้อสอบเพื่อติดดาว)', 'info');
+  }
+
+  const itemsHTML = ids.map(id => {
+    const info = Exams.setInfo(id);
+    const meta = Exams.parse(id);
+    const sub = meta && meta.subject ? subjectById(meta.subject) : null;
+    const b = best[id], p = progMap[id];
+    const status = p ? `<span class="chip chip-warning">ทำค้าง ${Object.keys(p.answers).length}/${p.qids.length}</span>`
+      : b ? `<span class="chip ${b.passed ? 'chip-success' : 'chip-danger'}">${b.passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${b.percent}%</span>`
+        : '<span class="chip">ยังไม่ได้ทำ</span>';
+    const tag = sub ? `เรื่องที่ ${sub.id}` : (meta && meta.type === 'final' ? (id === 'FINAL' ? 'ชุดรวม 100 ข้อ' : 'ชุดรวม') : 'แบบทดสอบ');
+    return `
+      <div class="starred-modal-item" data-modal-item="${id}">
+        <div class="starred-modal-item-left">
+          <div class="starred-modal-item-tags">
+            <span class="chip chip-primary small">${esc(tag)}</span>
+            ${status}
+          </div>
+          <b class="starred-modal-item-title">${esc(info.title || id)}</b>
+          <small class="muted">${info.questionCount || 50} ข้อ · เกณฑ์ผ่าน ${s.passPercent}%</small>
+        </div>
+        <div class="starred-modal-item-actions">
+          <button class="btn btn-primary btn-sm" data-start-starred="${id}">${p ? 'ทำต่อ' : 'เริ่มทำ'} →</button>
+          <button class="btn-star-unpin" data-unstar-modal="${id}" title="ยกเลิกติดดาว">⭐</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  await modal({
+    title: `⭐ ชุดข้อสอบที่ติดดาวไว้ (${ids.length} ชุด)`,
+    wide: true,
+    body: `<div class="starred-modal-list">${itemsHTML}</div>`,
+    actions: [{ label: 'ปิด', value: 'close', cls: 'btn-ghost' }],
+    onMount(bodyEl, close) {
+      bodyEl.querySelectorAll('[data-start-starred]').forEach(btn => {
+        btn.onclick = () => {
+          close('start');
+          startExam(btn.dataset.startStarred);
+        };
+      });
+
+      bodyEl.querySelectorAll('[data-unstar-modal]').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.unstarModal;
+          starred.delete(id);
+          await Repo.saveStarred(App.user.id, [...starred]);
+          
+          const item = btn.closest('.starred-modal-item');
+          if (item) {
+            item.style.transition = 'all 0.2s ease';
+            item.style.opacity = '0';
+            item.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+              item.remove();
+              if (starred.size === 0) {
+                close('empty');
+              }
+            }, 200);
+          }
+
+          $$(`[data-star-exam="${id}"]`).forEach(el => {
+            el.classList.remove('starred');
+            el.innerHTML = '☆';
+            el.title = 'ติดดาวชุดข้อสอบนี้';
+          });
+          $$(`.set-row[data-exam="${id}"]`).forEach(row => {
+            row.classList.remove('is-starred');
+          });
+
+          const starredCard = $('#btnStarredSets');
+          const starredCount = $('#starredSetsCount');
+          if (starredCard && starredCount) {
+            starredCard.disabled = starred.size === 0;
+            starredCount.textContent = starred.size ? `${starred.size} ชุดที่เลือกไว้` : 'กด ⭐ ที่ชุดข้อสอบเพื่อติดดาว';
+          }
+
+          toast('ยกเลิกการติดดาวแล้ว', 'info', 1200);
+        };
+      });
+    }
+  });
+}

@@ -258,6 +258,10 @@ const Repo = {
   async getBookmarks(u) { return (await DB.get('bookmark:' + u)) || []; },
   saveBookmarks: (u, list) => DB.set('bookmark:' + u, list),
 
+  /* starred exam sets */
+  async getStarred(u) { return (await DB.get('starred:' + u)) || []; },
+  saveStarred: (u, list) => DB.set('starred:' + u, list),
+
   /* summaries */
   getSummary: (sid) => DB.get('summary:' + sid),
   saveSummary: (sid, obj) => DB.set('summary:' + sid, obj),

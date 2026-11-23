@@ -10,6 +10,7 @@ async function renderQuiz(examId) {
   if (!p.qids.length) { await Repo.clearProgress(u.id, examId); toast('ข้อสอบชุดนี้ไม่มีแล้ว', 'warning'); return go('/home'); }
   p.current = Math.min(p.current || 0, p.qids.length - 1);
   let bookmarks = new Set(await Repo.getBookmarks(u.id));
+  let starred = new Set(await Repo.getStarred(u.id));
   let selected = null, finished = false, dirty = false;
   const title = Exams.title(examId);
 
@@ -24,7 +25,14 @@ async function renderQuiz(examId) {
         <span class="exit-label">บันทึกแล้วออก</span>
         <span class="exit-dot" title="บันทึกอัตโนมัติ"></span>
       </button>
-      <div class="quiz-title"><b>${esc(title)}</b><div class="quiz-progress"><div id="progBar"></div></div><small class="muted" id="progText"></small></div>
+      <div class="quiz-title">
+        <div class="quiz-title-head">
+          <b>${esc(title)}</b>
+          <button type="button" class="btn-star-quiz ${starred.has(examId) ? 'starred' : ''}" id="starExamBtn" title="${starred.has(examId) ? 'ชุดข้อสอบนี้ติดดาวแล้ว (คลิกเพื่อยกเลิก)' : 'ติดดาวชุดข้อสอบนี้'}" aria-label="ติดดาวชุดข้อสอบ">${starred.has(examId) ? '⭐' : '☆'}</button>
+        </div>
+        <div class="quiz-progress"><div id="progBar"></div></div>
+        <small class="muted" id="progText"></small>
+      </div>
       <div class="quiz-top-right">
         ${p.timed ? '<div class="timer" id="timer">⏱ --:--</div>' : '<div class="timer timer-free" id="timer">🧘 --:--</div>'}
         <button class="icon-btn sound-toggle" title="${Sound.isEnabled() ? 'เปิดเสียงเอฟเฟกต์อยู่ (คลิกเพื่อปิด)' : 'ปิดเสียงเอฟเฟกต์อยู่ (คลิกเพื่อเปิด)'}" aria-label="เปิด/ปิดเสียง">${Sound.icon()}</button>
@@ -436,6 +444,24 @@ async function renderQuiz(examId) {
   $('#exitBtn').onclick = async () => { await save(); toast('บันทึกความคืบหน้าแล้ว กลับมาทำต่อได้ทุกเมื่อ', 'success'); go('/home'); };
   $('#finishBtn').onclick = () => finish();
   $('#navToggle').onclick = () => $('#quizSide').classList.toggle('open');
+
+  const starExamBtn = document.getElementById('starExamBtn');
+  if (starExamBtn) {
+    starExamBtn.onclick = async () => {
+      const isStarred = starred.has(examId);
+      if (isStarred) {
+        starred.delete(examId);
+      } else {
+        starred.add(examId);
+      }
+      await Repo.saveStarred(u.id, [...starred]);
+      const newState = starred.has(examId);
+      starExamBtn.classList.toggle('starred', newState);
+      starExamBtn.innerHTML = newState ? '⭐' : '☆';
+      starExamBtn.title = newState ? 'ชุดข้อสอบนี้ติดดาวแล้ว (คลิกเพื่อยกเลิก)' : 'ติดดาวชุดข้อสอบนี้';
+      toast(newState ? '⭐ ติดดาวชุดข้อสอบนี้แล้ว' : 'ยกเลิกการติดดาวชุดข้อสอบแล้ว', 'success', 1500);
+    };
+  }
 
   renderQuestion(); renderNav();
 }
