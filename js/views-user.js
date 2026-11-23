@@ -845,7 +845,7 @@ async function renderHome() {
     </div>
   `, { active: 'home' });
 
-  $('[data-star-exam]').forEach((b) => {
+  $$('[data-star-exam]').forEach((b) => {
     b.onclick = async (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -859,12 +859,12 @@ async function renderHome() {
       await Repo.saveStarred(u.id, [...starred]);
       const isNowStarred = starred.has(examId);
       
-      $(`[data-star-exam="${examId}"]`).forEach((el) => {
+      $$(`[data-star-exam="${examId}"]`).forEach((el) => {
         el.classList.toggle('starred', isNowStarred);
         el.innerHTML = isNowStarred ? '⭐' : '☆';
         el.title = isNowStarred ? 'ยกเลิกติดดาวชุดนี้' : 'ติดดาวชุดข้อสอบนี้';
       });
-      $(`.set-row[data-exam="${examId}"]`).forEach((row) => {
+      $$(`.set-row[data-exam="${examId}"]`).forEach((row) => {
         row.classList.toggle('is-starred', isNowStarred);
       });
       
@@ -891,7 +891,7 @@ async function renderHome() {
     starredBtn.onclick = () => showStarredSetsModal(starred, best, progMap, s);
   }
 
-  $('[data-exam]').forEach((b) => (b.onclick = () => startExam(b.dataset.exam)));
+  $$('[data-exam]').forEach((b) => (b.onclick = () => startExam(b.dataset.exam)));
   $$('[data-resume]').forEach((b) => (b.onclick = () => go('/exam/' + b.dataset.resume)));
   $$('[data-restart]').forEach((b) => (b.onclick = async () => {
     if (await confirmBox('เริ่มทำใหม่?', 'คำตอบที่ทำค้างไว้ในชุดนี้จะถูกลบ', 'เริ่มใหม่', true)) newAttempt(b.dataset.restart);
