@@ -538,9 +538,9 @@ async function renderHome() {
     <section class="final-card ${finalAllowed ? '' : 'locked'}">
       <div class="final-card-head">
         <div class="final-card-head-left">
-          <span class="chip chip-glass">ชุดสอบเสมือนจริง · คลังข้อสอบคละ 2,295 ข้อ</span>
+          <span class="chip chip-glass">ชุดสอบเสมือนจริง · คลังข้อสอบคละ 2,395 ข้อ</span>
           <h2>ชุดรวมเทียบเคียงข้อสอบจริง คุรุสภา</h2>
-          <p class="final-desc">คลังข้อสอบคละ 5 หมวดสมรรถนะ รวม 2,295 ข้อ (ปี 2566, 2567 และแบบจำลองวัดความรู้เกณฑ์คุรุสภา 4 ระดับความยาก 22 ชุด) ตามเกณฑ์มาตรฐานความรู้และประสบการณ์วิชาชีพครู (B-License / A-License)</p>
+          <p class="final-desc">คลังข้อสอบคละ 5 หมวดสมรรถนะ รวม 2,395 ข้อ (ปี 2566, 2567, แบบจำลองเกณฑ์คุรุสภา 22 ชุด และชุดติวสรุป 10 ประเด็นออกสอบ B-License 2569) ตามเกณฑ์มาตรฐานความรู้และประสบการณ์วิชาชีพครู (B-License / A-License)</p>
         </div>
         <div class="final-card-head-right">
           ${finalBest ? `<div class="final-best-badge">คะแนนสูงสุด: <b>${finalBest.percent}%</b> ${finalBest.passed ? '✅ ผ่าน' : ''}</div>` : ''}
@@ -799,6 +799,16 @@ async function renderHome() {
               ${best['FINAL-24'] ? `<span class="chip ${best['FINAL-24'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-24'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-24'].percent}%</span>` : ''}
             </div>
             ${finalAllowed ? `<button class="btn btn-light btn-sm" data-exam="FINAL-24">${progMap['FINAL-24'] ? 'ทำต่อ / เริ่มใหม่' : 'เริ่มทำชุดที่ 24'} →</button>` : '<span class="chip chip-glass">🔒</span>'}
+          </div>
+
+          <div class="final-set-card">
+            <div class="final-set-info">
+              <div class="final-set-head-row"><span class="chip chip-glass">ชุดที่ 25 (ติวสรุป 10 ประเด็นออกสอบ 2569 100 ข้อ)</span>${starBtnHTML('FINAL-25')}</div>
+              <h4>แบบจำลองข้อสอบเสมือนจริง ติวสรุป 10 ประเด็นออกสอบวิชาครู (B-License)</h4>
+              <p class="muted-light">100 ข้อ · 5 ตัวเลือก ครบถ้วน 10 ประเด็นสำคัญ คละ 5 หมวดวิชา · เกณฑ์ผ่าน ${s.passPercent}%</p>
+              ${best['FINAL-25'] ? `<span class="chip ${best['FINAL-25'].passed ? 'chip-success' : 'chip-danger'} small mt-xs">${best['FINAL-25'].passed ? 'ผ่าน' : 'ยังไม่ผ่าน'} · ${best['FINAL-25'].percent}%</span>` : ''}
+            </div>
+            ${finalAllowed ? `<button class="btn btn-light btn-sm" data-exam="FINAL-25">${progMap['FINAL-25'] ? 'ทำต่อ / เริ่มใหม่' : 'เริ่มทำชุดที่ 25'} →</button>` : '<span class="chip chip-glass">🔒</span>'}
           </div>
         </div>
       </div>

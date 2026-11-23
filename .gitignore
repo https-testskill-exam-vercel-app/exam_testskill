@@ -12,3 +12,5 @@ $RECYCLE.BIN/
 # Logs & Temp
 *.log
 *.tmp
+*.pdf
+!docs/*.pdf

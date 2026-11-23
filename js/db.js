@@ -68,7 +68,7 @@ const DB = (() => {
 
 const Repo = {
   async init() {
-    const BANK_VERSION = 'v21_subj01_set4';
+    const BANK_VERSION = 'v22_final_set25';
     const currentVersion = await DB.get('bank_version');
     const needForceUpdate = currentVersion !== BANK_VERSION;
 
@@ -706,6 +706,15 @@ const EXAM_SET_INFO = {
     desc: 'ข้อสอบปรนัย 4 ตัวเลือก จำนวนรวม 100 ข้อ คละเนื้อหา 5 กลุ่มสาระ: จิตวิทยา (25), บริบทโลก/พอเพียง (12), หลักสูตร/เทคโนโลยี (30), วัดผล/วิจัย (25), ประกันคุณภาพ (8) ระดับความยาก 4 เลเวล พร้อมเฉลยและคำอธิบายละเอียด',
     questionCount: 100,
     timeMinutes: 180
+  },
+  'FINAL-25': {
+    title: 'แบบจำลองข้อสอบเสมือนจริง ติวสรุป 10 ประเด็นออกสอบวิชาครู (B-License 2569) (100 ข้อ)',
+    shortName: 'ติวสรุป 10 ประเด็นสอบวิชาครู 2569 (100 ข้อ)',
+    subtitle: 'ชุดที่ 25 · 100 ข้อ (ครอบคลุม 10 ประเด็นออกสอบ B-License 5 ตัวเลือก)',
+    docHeader: 'แบบจำลองข้อสอบเสมือนจริง ติวสรุป 10 ประเด็นออกสอบวิชาครู (B-License) ตามเกณฑ์คุรุสภา (100 ข้อ แบบคละ 5 หมวดสาระวิชา) | เวลาสอบ 180 นาที',
+    desc: 'ข้อสอบปรนัย 5 ตัวเลือก จำนวนรวม 100 ข้อ คละเนื้อหา 5 กลุ่มสาระตาม Test Blueprint: บริบทโลก/ศก.พอเพียง/VUCA/AI (12), จิตวิทยาพัฒนาการ/การศึกษา/การให้คำปรึกษา (25), หลักสูตร/Active Learning/ดิจิทัล (30), วัดผล/วิจัยในชั้นเรียน (25), ประกันคุณภาพ/SAR/SWOT (8) พร้อมเฉลยละเอียดและคำอธิบายองค์ความรู้',
+    questionCount: 100,
+    timeMinutes: 180
   }
 };
 
@@ -850,6 +859,7 @@ const Exams = {
     if (id === 'FINAL-22') return 'ชุดรวมที่ 22 (เสมือนจริงตามเกณฑ์ ชุด 11 100 ข้อ)';
     if (id === 'FINAL-23') return 'ชุดรวมที่ 23 (เสมือนจริงตามเกณฑ์ ชุด 12 100 ข้อ)';
     if (id === 'FINAL-24') return 'ชุดรวมที่ 24 (เสมือนจริงตามเกณฑ์ ชุด 13 100 ข้อ)';
+    if (id === 'FINAL-25') return 'ชุดรวมที่ 25 (สรุป 10 ประเด็นออกสอบ 100 ข้อ)';
     const meta = Exams.parse(id);
     if (meta && meta.type === 'subject') {
       const subNum = parseInt(meta.subject, 10);
