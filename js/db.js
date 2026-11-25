@@ -68,7 +68,7 @@ const DB = (() => {
 
 const Repo = {
   async init() {
-    const BANK_VERSION = 'v22_final_set25';
+    const BANK_VERSION = 'v23_fix_mock1_mock2_encoding';
     const currentVersion = await DB.get('bank_version');
     const needForceUpdate = currentVersion !== BANK_VERSION;
 
