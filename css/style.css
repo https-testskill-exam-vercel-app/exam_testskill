@@ -1347,9 +1347,28 @@ button {
   margin-bottom: 2.5rem;
 }
 .subject-card {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth);
+  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth);
+}
+.subject-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, #1d4ed8 0%, #0284c7 50%, #38bdf8 100%);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  z-index: 1;
+  transition: height var(--transition-fast), box-shadow var(--transition-fast);
+}
+.subject-card:hover:not(.locked)::before {
+  height: 7px;
+  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.35);
 }
 .subject-card:hover:not(.locked) {
   transform: translateY(-4px);
